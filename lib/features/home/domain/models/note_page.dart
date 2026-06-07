@@ -1,0 +1,17 @@
+// Isar collection representing a single page within a notebook.
+
+import 'package:isar/isar.dart';
+
+part 'note_page.g.dart';
+
+@collection
+class NotePage {
+  Id id = Isar.autoIncrement;
+
+  @Index()
+  late int notebookId;
+
+  late int pageIndex;
+
+  late DateTime createdAt;
+}

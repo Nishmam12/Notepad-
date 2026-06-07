@@ -1,0 +1,69 @@
+// Repository providing CRUD operations for Notebook and NotePage collections.
+
+import 'package:isar/isar.dart';
+
+import '../../domain/models/notebook.dart';
+import '../../domain/models/note_page.dart';
+
+class NoteRepository {
+  final Isar _isar;
+
+  NoteRepository(this._isar);
+
+  /// Creates a new notebook with the given title and returns it.
+  Future<Notebook> createNotebook(String title) async {
+    final notebook = Notebook()
+      ..title = title
+      ..createdAt = DateTime.now()
+      ..modifiedAt = DateTime.now()
+      ..pageCount = 1;
+
+    await _isar.writeTxn(() async {
+      await _isar.notebooks.put(notebook);
+    });
+
+    // Create the first page for this notebook.
+    final firstPage = NotePage()
+      ..notebookId = notebook.id
+      ..pageIndex = 0
+      ..createdAt = DateTime.now();
+
+    await _isar.writeTxn(() async {
+      await _isar.notePages.put(firstPage);
+    });
+
+    return notebook;
+  }
+
+  /// Returns all notebooks, ordered by most recently modified first.
+  Future<List<Notebook>> getAllNotebooks() async {
+    return _isar.notebooks.where().sortByModifiedAtDesc().findAll();
+  }
+
+  /// Deletes a notebook and all its pages by notebook ID.
+  Future<void> deleteNotebook(int id) async {
+    await _isar.writeTxn(() async {
+      // Delete all pages belonging to this notebook.
+      await _isar.notePages.filter().notebookIdEqualTo(id).deleteAll();
+      // Delete the notebook itself.
+      await _isar.notebooks.delete(id);
+    });
+  }
+
+  /// Updates the title and modifiedAt timestamp of an existing notebook.
+  Future<void> updateNotebook(Notebook notebook) async {
+    notebook.modifiedAt = DateTime.now();
+    await _isar.writeTxn(() async {
+      await _isar.notebooks.put(notebook);
+    });
+  }
+
+  /// Returns all pages for a given notebook, ordered by page index.
+  Future<List<NotePage>> getPagesForNotebook(int notebookId) async {
+    return _isar.notePages
+        .filter()
+        .notebookIdEqualTo(notebookId)
+        .sortByPageIndex()
+        .findAll();
+  }
+}
