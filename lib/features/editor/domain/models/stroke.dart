@@ -7,6 +7,7 @@ class Stroke {
   final int color;
   final double size;
   final double opacity;
+  final bool isEraser;
   final List<StrokePoint> points;
 
   const Stroke({
@@ -14,6 +15,7 @@ class Stroke {
     required this.color,
     required this.size,
     this.opacity = 1.0,
+    this.isEraser = false,
     required this.points,
   });
 
@@ -24,6 +26,7 @@ class Stroke {
       color: map['color'] as int,
       size: (map['size'] as num).toDouble(),
       opacity: (map['opacity'] as num?)?.toDouble() ?? 1.0,
+      isEraser: map['isEraser'] as bool? ?? false,
       points: (map['points'] as List<dynamic>)
           .map((p) => StrokePoint.fromMap(p as Map<String, dynamic>))
           .toList(),
@@ -37,6 +40,7 @@ class Stroke {
       'color': color,
       'size': size,
       'opacity': opacity,
+      'isEraser': isEraser,
       'points': points.map((p) => p.toMap()).toList(),
     };
   }
@@ -47,6 +51,7 @@ class Stroke {
     int? color,
     double? size,
     double? opacity,
+    bool? isEraser,
     List<StrokePoint>? points,
   }) {
     return Stroke(
@@ -54,6 +59,7 @@ class Stroke {
       color: color ?? this.color,
       size: size ?? this.size,
       opacity: opacity ?? this.opacity,
+      isEraser: isEraser ?? this.isEraser,
       points: points ?? this.points,
     );
   }

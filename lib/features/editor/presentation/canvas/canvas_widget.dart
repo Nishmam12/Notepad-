@@ -16,6 +16,7 @@ class CanvasWidget extends StatelessWidget {
   final double currentStrokeSize;
   final double currentStrokeOpacity;
   final Color backgroundColor;
+  final bool isEraser;
   final TemplateType templateType;
 
   const CanvasWidget({
@@ -25,6 +26,7 @@ class CanvasWidget extends StatelessWidget {
     required this.currentStrokeColor,
     required this.currentStrokeSize,
     this.currentStrokeOpacity = 1.0,
+    this.isEraser = false,
     this.backgroundColor = Colors.white,
     this.templateType = TemplateType.blank,
   });
@@ -64,6 +66,7 @@ class CanvasWidget extends StatelessWidget {
               strokeColor: currentStrokeColor,
               strokeSize: currentStrokeSize,
               strokeOpacity: currentStrokeOpacity,
+              isEraser: isEraser,
             ),
             size: Size.infinite,
           ),

@@ -19,6 +19,33 @@ subprojects {
     project.evaluationDependsOn(":app")
 }
 
+subprojects {
+    val configureProject = {
+        val androidExtension = extensions.findByName("android")
+        if (androidExtension != null) {
+            try {
+                val getNamespace = androidExtension.javaClass.getMethod("getNamespace")
+                val setNamespace = androidExtension.javaClass.getMethod("setNamespace", String::class.java)
+                val currentNamespace = getNamespace.invoke(androidExtension)
+                if (currentNamespace == null) {
+                    val ns = "com.inkflow.${project.name.replace("_", ".").replace("-", ".")}"
+                    setNamespace.invoke(androidExtension, ns)
+                    println("Dynamically set namespace for subproject ${project.name} to $ns")
+                }
+            } catch (e: Exception) {
+                // Ignore if method not found or other reflection errors
+            }
+        }
+    }
+    if (state.executed) {
+        configureProject()
+    } else {
+        afterEvaluate {
+            configureProject()
+        }
+    }
+}
+
 tasks.register<Delete>("clean") {
     delete(rootProject.layout.buildDirectory)
 }

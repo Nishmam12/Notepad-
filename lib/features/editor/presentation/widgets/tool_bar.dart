@@ -54,11 +54,21 @@ class ToolBar extends ConsumerWidget {
 
                 // Eraser tool
                 _ToolButton(
-                  icon: Icons.auto_fix_high,
+                  icon: toolState.eraserType == EraserType.pixel 
+                      ? Icons.layers_clear 
+                      : Icons.auto_fix_high,
                   isActive: toolState.isEraser,
                   activeColor: AppColors.accentYellow,
-                  onTap: () => ref.read(toolProvider.notifier).setEraser(),
-                  tooltip: 'Eraser',
+                  onTap: () {
+                    if (toolState.isEraser) {
+                      ref.read(toolProvider.notifier).toggleEraserType();
+                    } else {
+                      ref.read(toolProvider.notifier).setEraser();
+                    }
+                  },
+                  tooltip: toolState.eraserType == EraserType.pixel 
+                      ? 'Pixel Eraser' 
+                      : 'Stroke Eraser',
                 ),
                 const SizedBox(width: 8),
 

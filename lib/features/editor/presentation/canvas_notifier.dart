@@ -28,12 +28,18 @@ class CanvasState {
   }
 }
 
+enum EraserType {
+  stroke,
+  pixel,
+}
+
 /// Immutable state for the active drawing tool.
 class ToolState {
   final Color color;
   final double size;
   final double opacity;
   final bool isEraser;
+  final EraserType eraserType;
   final TemplateType template;
 
   const ToolState({
@@ -41,6 +47,7 @@ class ToolState {
     this.size = 4.0,
     this.opacity = 1.0,
     this.isEraser = false,
+    this.eraserType = EraserType.stroke,
     this.template = TemplateType.blank,
   });
 
@@ -51,6 +58,7 @@ class ToolState {
     double? size,
     double? opacity,
     bool? isEraser,
+    EraserType? eraserType,
     TemplateType? template,
   }) {
     return ToolState(
@@ -58,6 +66,7 @@ class ToolState {
       size: size ?? this.size,
       opacity: opacity ?? this.opacity,
       isEraser: isEraser ?? this.isEraser,
+      eraserType: eraserType ?? this.eraserType,
       template: template ?? this.template,
     );
   }
@@ -74,7 +83,7 @@ class CanvasStateNotifier extends StateNotifier<CanvasState> {
   }
 
   /// Finishes the current stroke and adds it to the completed strokes list.
-  void finishStroke(Color color, double size, double opacity) {
+  void finishStroke(Color color, double size, double opacity, {bool isEraser = false}) {
     if (state.currentStrokePoints.isEmpty) return;
 
     final stroke = Stroke(
@@ -82,6 +91,7 @@ class CanvasStateNotifier extends StateNotifier<CanvasState> {
       color: color.toARGB32(),
       size: size,
       opacity: opacity,
+      isEraser: isEraser,
       points: List.from(state.currentStrokePoints),
     );
 
@@ -178,6 +188,13 @@ class ToolNotifier extends StateNotifier<ToolState> {
   void setSize(double size) => state = state.copyWith(size: size);
   void setOpacity(double opacity) => state = state.copyWith(opacity: opacity);
   void toggleEraser() => state = state.copyWith(isEraser: !state.isEraser);
+  void toggleEraserType() {
+    state = state.copyWith(
+      eraserType: state.eraserType == EraserType.stroke
+          ? EraserType.pixel
+          : EraserType.stroke,
+    );
+  }
   void setPen() => state = state.copyWith(isEraser: false);
   void setEraser() => state = state.copyWith(isEraser: true);
   void setTemplate(TemplateType template) =>

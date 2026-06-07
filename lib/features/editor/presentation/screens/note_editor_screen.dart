@@ -91,25 +91,27 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
           children: [
             RawPointerListener(
               onPointerDown: (point) {
-                if (toolState.isEraser) {
+                if (toolState.isEraser && toolState.eraserType == EraserType.stroke) {
                   ref.read(canvasStateProvider.notifier).eraseAtPoint(point, toolState.size * 2);
                 } else {
+                  // For pen OR pixel eraser, we capture points.
                   ref.read(canvasStateProvider.notifier).addPoint(point);
                 }
               },
               onPointerMove: (point) {
-                if (toolState.isEraser) {
+                if (toolState.isEraser && toolState.eraserType == EraserType.stroke) {
                   ref.read(canvasStateProvider.notifier).eraseAtPoint(point, toolState.size * 2);
                 } else {
                   ref.read(canvasStateProvider.notifier).addPoint(point);
                 }
               },
               onPointerUp: () {
-                if (!toolState.isEraser) {
+                if (!toolState.isEraser || toolState.eraserType == EraserType.pixel) {
                   ref.read(canvasStateProvider.notifier).finishStroke(
                         toolState.color,
                         toolState.size,
                         toolState.opacity,
+                        isEraser: toolState.isEraser,
                       );
                   // Push the command to the undo stack.
                   final strokes = ref.read(canvasStateProvider).completedStrokes;
@@ -128,6 +130,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                 currentStrokeColor: toolState.color,
                 currentStrokeSize: toolState.size,
                 currentStrokeOpacity: toolState.opacity,
+                isEraser: toolState.isEraser,
                 templateType: toolState.template,
               ),
             ),

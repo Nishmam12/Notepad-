@@ -5,6 +5,9 @@ import 'package:perfect_freehand/perfect_freehand.dart';
 
 import '../../../domain/models/stroke.dart';
 
+// A cache for generated paths to prevent recalculating `perfect_freehand` every frame.
+final Map<String, Path> _pathCache = {};
+
 class StrokeHistoryLayer extends CustomPainter {
   final List<Stroke> strokes;
 
@@ -14,37 +17,50 @@ class StrokeHistoryLayer extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    // Use saveLayer to ensure BlendMode.clear only punches holes in the strokes layer,
+    // leaving the underlying background/templates completely intact.
+    canvas.saveLayer(Rect.fromLTWH(0, 0, size.width, size.height), Paint());
+    
     for (final stroke in strokes) {
       _drawStroke(canvas, stroke);
     }
+    
+    canvas.restore();
   }
 
   void _drawStroke(Canvas canvas, Stroke stroke) {
     if (stroke.points.isEmpty) return;
 
     final paint = Paint()
-      ..color = Color(stroke.color).withValues(alpha: stroke.opacity)
+      ..color = stroke.isEraser 
+          ? Colors.transparent 
+          : Color(stroke.color).withValues(alpha: stroke.opacity)
+      ..blendMode = stroke.isEraser ? BlendMode.clear : BlendMode.srcOver
       ..style = PaintingStyle.fill;
 
-    final inputPoints = stroke.points
-        .map((p) => PointVector(p.x, p.y, p.pressure))
-        .toList();
+    Path? path = _pathCache[stroke.id];
+    if (path == null) {
+      final inputPoints = stroke.points
+          .map((p) => PointVector(p.x, p.y, p.pressure))
+          .toList();
 
-    final outlinePoints = getStroke(
-      inputPoints,
-      options: StrokeOptions(
-        size: stroke.size,
-        thinning: 0.7,
-        smoothing: 0.5,
-        streamline: 0.5,
-        simulatePressure: false,
-        isComplete: true,
-      ),
-    );
+      final outlinePoints = getStroke(
+        inputPoints,
+        options: StrokeOptions(
+          size: stroke.size,
+          thinning: 0.7,
+          smoothing: 0.5,
+          streamline: 0.5,
+          simulatePressure: false,
+          isComplete: true,
+        ),
+      );
 
-    if (outlinePoints.isEmpty) return;
+      if (outlinePoints.isEmpty) return;
+      path = _buildPath(outlinePoints);
+      _pathCache[stroke.id] = path;
+    }
 
-    final path = _buildPath(outlinePoints);
     canvas.drawPath(path, paint);
   }
 
