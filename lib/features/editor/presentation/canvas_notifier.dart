@@ -203,8 +203,8 @@ class ToolNotifier extends StateNotifier<ToolState> {
 
 /// Canvas state provider — auto-disposes when leaving the editor screen.
 final canvasStateProvider =
-    StateNotifierProvider.autoDispose<CanvasStateNotifier, CanvasState>(
-  (ref) => CanvasStateNotifier(),
+    StateNotifierProvider.autoDispose.family<CanvasStateNotifier, CanvasState, int>(
+  (ref, pageIndex) => CanvasStateNotifier(),
 );
 
 /// Tool state provider — persists across editor sessions.

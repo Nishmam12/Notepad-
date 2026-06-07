@@ -22,13 +22,24 @@ const NotePageSchema = CollectionSchema(
       name: r'createdAt',
       type: IsarType.dateTime,
     ),
-    r'notebookId': PropertySchema(
+    r'importedContents': PropertySchema(
       id: 1,
+      name: r'importedContents',
+      type: IsarType.objectList,
+      target: r'ImportedContent',
+    ),
+    r'modifiedAt': PropertySchema(
+      id: 2,
+      name: r'modifiedAt',
+      type: IsarType.dateTime,
+    ),
+    r'notebookId': PropertySchema(
+      id: 3,
       name: r'notebookId',
       type: IsarType.long,
     ),
     r'pageIndex': PropertySchema(
-      id: 2,
+      id: 4,
       name: r'pageIndex',
       type: IsarType.long,
     )
@@ -54,7 +65,7 @@ const NotePageSchema = CollectionSchema(
     )
   },
   links: {},
-  embeddedSchemas: {},
+  embeddedSchemas: {r'ImportedContent': ImportedContentSchema},
   getId: _notePageGetId,
   getLinks: _notePageGetLinks,
   attach: _notePageAttach,
@@ -67,6 +78,15 @@ int _notePageEstimateSize(
   Map<Type, List<int>> allOffsets,
 ) {
   var bytesCount = offsets.last;
+  bytesCount += 3 + object.importedContents.length * 3;
+  {
+    final offsets = allOffsets[ImportedContent]!;
+    for (var i = 0; i < object.importedContents.length; i++) {
+      final value = object.importedContents[i];
+      bytesCount +=
+          ImportedContentSchema.estimateSize(value, offsets, allOffsets);
+    }
+  }
   return bytesCount;
 }
 
@@ -77,8 +97,15 @@ void _notePageSerialize(
   Map<Type, List<int>> allOffsets,
 ) {
   writer.writeDateTime(offsets[0], object.createdAt);
-  writer.writeLong(offsets[1], object.notebookId);
-  writer.writeLong(offsets[2], object.pageIndex);
+  writer.writeObjectList<ImportedContent>(
+    offsets[1],
+    allOffsets,
+    ImportedContentSchema.serialize,
+    object.importedContents,
+  );
+  writer.writeDateTime(offsets[2], object.modifiedAt);
+  writer.writeLong(offsets[3], object.notebookId);
+  writer.writeLong(offsets[4], object.pageIndex);
 }
 
 NotePage _notePageDeserialize(
@@ -90,8 +117,16 @@ NotePage _notePageDeserialize(
   final object = NotePage();
   object.createdAt = reader.readDateTime(offsets[0]);
   object.id = id;
-  object.notebookId = reader.readLong(offsets[1]);
-  object.pageIndex = reader.readLong(offsets[2]);
+  object.importedContents = reader.readObjectList<ImportedContent>(
+        offsets[1],
+        ImportedContentSchema.deserialize,
+        allOffsets,
+        ImportedContent(),
+      ) ??
+      [];
+  object.modifiedAt = reader.readDateTime(offsets[2]);
+  object.notebookId = reader.readLong(offsets[3]);
+  object.pageIndex = reader.readLong(offsets[4]);
   return object;
 }
 
@@ -105,8 +140,18 @@ P _notePageDeserializeProp<P>(
     case 0:
       return (reader.readDateTime(offset)) as P;
     case 1:
-      return (reader.readLong(offset)) as P;
+      return (reader.readObjectList<ImportedContent>(
+            offset,
+            ImportedContentSchema.deserialize,
+            allOffsets,
+            ImportedContent(),
+          ) ??
+          []) as P;
     case 2:
+      return (reader.readDateTime(offset)) as P;
+    case 3:
+      return (reader.readLong(offset)) as P;
+    case 4:
       return (reader.readLong(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -405,6 +450,148 @@ extension NotePageQueryFilter
     });
   }
 
+  QueryBuilder<NotePage, NotePage, QAfterFilterCondition>
+      importedContentsLengthEqualTo(int length) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'importedContents',
+        length,
+        true,
+        length,
+        true,
+      );
+    });
+  }
+
+  QueryBuilder<NotePage, NotePage, QAfterFilterCondition>
+      importedContentsIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'importedContents',
+        0,
+        true,
+        0,
+        true,
+      );
+    });
+  }
+
+  QueryBuilder<NotePage, NotePage, QAfterFilterCondition>
+      importedContentsIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'importedContents',
+        0,
+        false,
+        999999,
+        true,
+      );
+    });
+  }
+
+  QueryBuilder<NotePage, NotePage, QAfterFilterCondition>
+      importedContentsLengthLessThan(
+    int length, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'importedContents',
+        0,
+        true,
+        length,
+        include,
+      );
+    });
+  }
+
+  QueryBuilder<NotePage, NotePage, QAfterFilterCondition>
+      importedContentsLengthGreaterThan(
+    int length, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'importedContents',
+        length,
+        include,
+        999999,
+        true,
+      );
+    });
+  }
+
+  QueryBuilder<NotePage, NotePage, QAfterFilterCondition>
+      importedContentsLengthBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'importedContents',
+        lower,
+        includeLower,
+        upper,
+        includeUpper,
+      );
+    });
+  }
+
+  QueryBuilder<NotePage, NotePage, QAfterFilterCondition> modifiedAtEqualTo(
+      DateTime value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'modifiedAt',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<NotePage, NotePage, QAfterFilterCondition> modifiedAtGreaterThan(
+    DateTime value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'modifiedAt',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<NotePage, NotePage, QAfterFilterCondition> modifiedAtLessThan(
+    DateTime value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'modifiedAt',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<NotePage, NotePage, QAfterFilterCondition> modifiedAtBetween(
+    DateTime lower,
+    DateTime upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'modifiedAt',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
   QueryBuilder<NotePage, NotePage, QAfterFilterCondition> notebookIdEqualTo(
       int value) {
     return QueryBuilder.apply(this, (query) {
@@ -513,7 +700,14 @@ extension NotePageQueryFilter
 }
 
 extension NotePageQueryObject
-    on QueryBuilder<NotePage, NotePage, QFilterCondition> {}
+    on QueryBuilder<NotePage, NotePage, QFilterCondition> {
+  QueryBuilder<NotePage, NotePage, QAfterFilterCondition>
+      importedContentsElement(FilterQuery<ImportedContent> q) {
+    return QueryBuilder.apply(this, (query) {
+      return query.object(q, r'importedContents');
+    });
+  }
+}
 
 extension NotePageQueryLinks
     on QueryBuilder<NotePage, NotePage, QFilterCondition> {}
@@ -528,6 +722,18 @@ extension NotePageQuerySortBy on QueryBuilder<NotePage, NotePage, QSortBy> {
   QueryBuilder<NotePage, NotePage, QAfterSortBy> sortByCreatedAtDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'createdAt', Sort.desc);
+    });
+  }
+
+  QueryBuilder<NotePage, NotePage, QAfterSortBy> sortByModifiedAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'modifiedAt', Sort.asc);
+    });
+  }
+
+  QueryBuilder<NotePage, NotePage, QAfterSortBy> sortByModifiedAtDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'modifiedAt', Sort.desc);
     });
   }
 
@@ -582,6 +788,18 @@ extension NotePageQuerySortThenBy
     });
   }
 
+  QueryBuilder<NotePage, NotePage, QAfterSortBy> thenByModifiedAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'modifiedAt', Sort.asc);
+    });
+  }
+
+  QueryBuilder<NotePage, NotePage, QAfterSortBy> thenByModifiedAtDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'modifiedAt', Sort.desc);
+    });
+  }
+
   QueryBuilder<NotePage, NotePage, QAfterSortBy> thenByNotebookId() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'notebookId', Sort.asc);
@@ -615,6 +833,12 @@ extension NotePageQueryWhereDistinct
     });
   }
 
+  QueryBuilder<NotePage, NotePage, QDistinct> distinctByModifiedAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'modifiedAt');
+    });
+  }
+
   QueryBuilder<NotePage, NotePage, QDistinct> distinctByNotebookId() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'notebookId');
@@ -639,6 +863,19 @@ extension NotePageQueryProperty
   QueryBuilder<NotePage, DateTime, QQueryOperations> createdAtProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'createdAt');
+    });
+  }
+
+  QueryBuilder<NotePage, List<ImportedContent>, QQueryOperations>
+      importedContentsProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'importedContents');
+    });
+  }
+
+  QueryBuilder<NotePage, DateTime, QQueryOperations> modifiedAtProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'modifiedAt');
     });
   }
 

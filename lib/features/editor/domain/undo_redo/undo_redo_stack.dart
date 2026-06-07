@@ -72,7 +72,6 @@ class UndoRedoNotifier extends StateNotifier<UndoRedoState> {
 }
 
 /// Undo/redo provider — auto-disposes when leaving the editor screen.
-final undoRedoProvider =
-    StateNotifierProvider.autoDispose<UndoRedoNotifier, UndoRedoState>(
-  (ref) => UndoRedoNotifier(),
-);
+final undoRedoProvider = StateNotifierProvider.autoDispose.family<UndoRedoNotifier, UndoRedoState, int>((ref, pageIndex) {
+  return UndoRedoNotifier();
+});

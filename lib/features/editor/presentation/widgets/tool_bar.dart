@@ -8,14 +8,23 @@ import '../../domain/models/template_type.dart';
 import '../canvas_notifier.dart';
 import '../../domain/undo_redo/undo_redo_stack.dart';
 import 'template_picker.dart';
+import '../../../import/presentation/import_bottom_sheet.dart';
 
-class ToolBar extends ConsumerWidget {
-  const ToolBar({super.key});
+class ToolBar extends ConsumerStatefulWidget {
+  final int notebookId;
+  final int pageIndex;
+
+  const ToolBar({super.key, required this.notebookId, required this.pageIndex});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ToolBar> createState() => _ToolBarState();
+}
+
+class _ToolBarState extends ConsumerState<ToolBar> {
+  @override
+  Widget build(BuildContext context) {
     final toolState = ref.watch(toolProvider);
-    final undoRedoState = ref.watch(undoRedoProvider);
+    final undoRedoState = ref.watch(undoRedoProvider(widget.pageIndex));
 
     return Positioned(
       bottom: 24,
@@ -86,7 +95,7 @@ class ToolBar extends ConsumerWidget {
                   isActive: false, // Will be wired to history state
                   activeColor: AppColors.textSecondary,
                   onTap: undoRedoState.canUndo
-                      ? () => ref.read(undoRedoProvider.notifier).undo()
+                      ? () => ref.read(undoRedoProvider(widget.pageIndex).notifier).undo()
                       : null,
                   tooltip: 'Undo',
                 ),
@@ -98,7 +107,7 @@ class ToolBar extends ConsumerWidget {
                   isActive: false,
                   activeColor: AppColors.textSecondary,
                   onTap: undoRedoState.canRedo
-                      ? () => ref.read(undoRedoProvider.notifier).redo()
+                      ? () => ref.read(undoRedoProvider(widget.pageIndex).notifier).redo()
                       : null,
                   tooltip: 'Redo',
                 ),
@@ -162,6 +171,26 @@ class ToolBar extends ConsumerWidget {
                   activeColor: AppColors.accentPurple,
                   onTap: () => showTemplatePicker(context, ref),
                   tooltip: 'Template',
+                ),
+                const SizedBox(width: 8),
+
+                // Divider
+                Container(
+                  width: 1,
+                  height: 28,
+                  color: AppColors.border,
+                ),
+                const SizedBox(width: 8),
+
+                // Import
+                _ToolButton(
+                  icon: Icons.file_upload_outlined,
+                  isActive: false,
+                  activeColor: AppColors.accentGreen,
+                  onTap: () {
+                    ImportBottomSheet.show(context, widget.notebookId, widget.pageIndex);
+                  },
+                  tooltip: 'Import',
                 ),
               ],
             ),

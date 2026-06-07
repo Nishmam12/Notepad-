@@ -19,7 +19,7 @@ class InkFileStorage {
   /// Returns the file path for a specific page's ink data.
   static Future<String> _pageFilePath(int notebookId, int pageId) async {
     final dir = await _notebookDir(notebookId);
-    return '$dir/$pageId.ink';
+    return '$dir/page_$pageId.ink';
   }
 
   /// Saves a list of strokes to an .ink file for a given notebook and page.
@@ -50,10 +50,17 @@ class InkFileStorage {
     }
 
     final jsonString = await file.readAsString();
-    final data = jsonDecode(jsonString) as List<dynamic>;
-    return data
-        .map((item) => Stroke.fromMap(item as Map<String, dynamic>))
-        .toList();
+    if (jsonString.trim().isEmpty) return [];
+
+    try {
+      final data = jsonDecode(jsonString) as List<dynamic>;
+      return data
+          .map((item) => Stroke.fromMap(item as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      // If the file is corrupted, return an empty canvas rather than crashing
+      return [];
+    }
   }
 
   /// Deletes all ink files for a given notebook.

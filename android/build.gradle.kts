@@ -19,6 +19,8 @@ subprojects {
     project.evaluationDependsOn(":app")
 }
 
+
+
 subprojects {
     val configureProject = {
         val androidExtension = extensions.findByName("android")
@@ -35,6 +37,10 @@ subprojects {
             } catch (e: Exception) {
                 // Ignore if method not found or other reflection errors
             }
+            try {
+                val setCompileSdk = androidExtension.javaClass.getMethod("setCompileSdkVersion", Int::class.java)
+                setCompileSdk.invoke(androidExtension, 36)
+            } catch (e: Exception) {}
         }
     }
     if (state.executed) {

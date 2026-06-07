@@ -8,6 +8,8 @@ import '../../domain/models/template_type.dart';
 import 'layers/background_layer.dart';
 import 'layers/stroke_history_layer.dart';
 import 'layers/active_stroke_layer.dart';
+import 'layers/imported_content_layer.dart';
+import '../imported_content_notifier.dart';
 
 class CanvasWidget extends StatelessWidget {
   final List<Stroke> completedStrokes;
@@ -15,6 +17,7 @@ class CanvasWidget extends StatelessWidget {
   final Color currentStrokeColor;
   final double currentStrokeSize;
   final double currentStrokeOpacity;
+  final ImportedContentState importedContentState;
   final Color backgroundColor;
   final bool isEraser;
   final TemplateType templateType;
@@ -25,6 +28,7 @@ class CanvasWidget extends StatelessWidget {
     required this.currentStrokePoints,
     required this.currentStrokeColor,
     required this.currentStrokeSize,
+    required this.importedContentState,
     this.currentStrokeOpacity = 1.0,
     this.isEraser = false,
     this.backgroundColor = Colors.white,
@@ -46,8 +50,17 @@ class CanvasWidget extends StatelessWidget {
           ),
         ),
 
-        // Layer 1: ImportedContentLayer — placeholder for Phase 4.
-        // Will hold PDF pages and images as a locked background.
+        // Layer 1: ImportedContentLayer — PDF pages and images.
+        RepaintBoundary(
+          child: CustomPaint(
+            painter: ImportedContentLayer(
+              contents: importedContentState.contents,
+              loadedImages: importedContentState.loadedImages,
+              canvasSize: MediaQuery.of(context).size,
+            ),
+            size: Size.infinite,
+          ),
+        ),
 
         // Layer 2: Stroke History — completed strokes, cached as GPU texture.
         RepaintBoundary(

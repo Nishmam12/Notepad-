@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.inkflow.inkflow"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
