@@ -36,121 +36,125 @@ class ToolBar extends ConsumerWidget {
               ),
             ],
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Pen tool
-              _ToolButton(
-                icon: Icons.edit,
-                isActive: !toolState.isEraser,
-                activeColor: AppColors.accent,
-                onTap: () => ref.read(toolProvider.notifier).setPen(),
-                tooltip: 'Pen',
-              ),
-              const SizedBox(width: 4),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Pen tool
+                _ToolButton(
+                  icon: Icons.edit,
+                  isActive: !toolState.isEraser,
+                  activeColor: AppColors.accent,
+                  onTap: () => ref.read(toolProvider.notifier).setPen(),
+                  tooltip: 'Pen',
+                ),
+                const SizedBox(width: 4),
 
-              // Eraser tool
-              _ToolButton(
-                icon: Icons.auto_fix_high,
-                isActive: toolState.isEraser,
-                activeColor: AppColors.accentYellow,
-                onTap: () => ref.read(toolProvider.notifier).setEraser(),
-                tooltip: 'Eraser',
-              ),
-              const SizedBox(width: 8),
+                // Eraser tool
+                _ToolButton(
+                  icon: Icons.auto_fix_high,
+                  isActive: toolState.isEraser,
+                  activeColor: AppColors.accentYellow,
+                  onTap: () => ref.read(toolProvider.notifier).setEraser(),
+                  tooltip: 'Eraser',
+                ),
+                const SizedBox(width: 8),
 
-              // Divider
-              Container(
-                width: 1,
-                height: 28,
-                color: AppColors.border,
-              ),
-              const SizedBox(width: 8),
+                // Divider
+                Container(
+                  width: 1,
+                  height: 28,
+                  color: AppColors.border,
+                ),
+                const SizedBox(width: 8),
 
-              // Undo
-              _ToolButton(
-                icon: Icons.undo,
-                isActive: false,
-                activeColor: AppColors.textSecondary,
-                onTap: undoRedoState.canUndo
-                    ? () => ref.read(undoRedoProvider.notifier).undo()
-                    : null,
-                tooltip: 'Undo',
-              ),
-              const SizedBox(width: 4),
+                // Undo
+                _ToolButton(
+                  icon: Icons.undo,
+                  isActive: false, // Will be wired to history state
+                  activeColor: AppColors.textSecondary,
+                  onTap: undoRedoState.canUndo
+                      ? () => ref.read(undoRedoProvider.notifier).undo()
+                      : null,
+                  tooltip: 'Undo',
+                ),
+                const SizedBox(width: 4),
 
-              // Redo
-              _ToolButton(
-                icon: Icons.redo,
-                isActive: false,
-                activeColor: AppColors.textSecondary,
-                onTap: undoRedoState.canRedo
-                    ? () => ref.read(undoRedoProvider.notifier).redo()
-                    : null,
-                tooltip: 'Redo',
-              ),
-              const SizedBox(width: 8),
+                // Redo
+                _ToolButton(
+                  icon: Icons.redo,
+                  isActive: false,
+                  activeColor: AppColors.textSecondary,
+                  onTap: undoRedoState.canRedo
+                      ? () => ref.read(undoRedoProvider.notifier).redo()
+                      : null,
+                  tooltip: 'Redo',
+                ),
+                const SizedBox(width: 8),
 
-              // Divider
-              Container(
-                width: 1,
-                height: 28,
-                color: AppColors.border,
-              ),
-              const SizedBox(width: 8),
+                // Divider
+                Container(
+                  width: 1,
+                  height: 28,
+                  color: AppColors.border,
+                ),
+                const SizedBox(width: 8),
 
-              // Color picker
-              _ColorDot(
-                color: toolState.color,
-                onTap: () => _showColorPicker(context, ref),
-              ),
-              const SizedBox(width: 8),
+                // Color picker
+                _ColorDot(
+                  color: toolState.color,
+                  onTap: () => _showColorPicker(context, ref),
+                ),
+                const SizedBox(width: 8),
 
-              // Size slider
-              SizedBox(
-                width: 80,
-                child: SliderTheme(
-                  data: const SliderThemeData(
-                    activeTrackColor: AppColors.accent,
-                    inactiveTrackColor: AppColors.border,
-                    thumbColor: AppColors.accent,
-                    trackHeight: 3,
-                    thumbShape: RoundSliderThumbShape(
-                      enabledThumbRadius: 6,
+                // Size slider
+                SizedBox(
+                  width: 80,
+                  child: SliderTheme(
+                    data: const SliderThemeData(
+                      activeTrackColor: AppColors.accent,
+                      inactiveTrackColor: AppColors.border,
+                      thumbColor: AppColors.accent,
+                      trackHeight: 3,
+                      thumbShape: RoundSliderThumbShape(
+                        enabledThumbRadius: 6,
+                      ),
+                      overlayShape: RoundSliderOverlayShape(
+                        overlayRadius: 14,
+                      ),
                     ),
-                    overlayShape: RoundSliderOverlayShape(
-                      overlayRadius: 14,
+                    child: Slider(
+                      value: toolState.size,
+                      min: 1.0,
+                      max: 20.0,
+                      onChanged: (value) {
+                        ref.read(toolProvider.notifier).setSize(value);
+                      },
                     ),
-                  ),
-                  child: Slider(
-                    value: toolState.size,
-                    min: 1.0,
-                    max: 20.0,
-                    onChanged: (value) {
-                      ref.read(toolProvider.notifier).setSize(value);
-                    },
                   ),
                 ),
-              ),
-              const SizedBox(width: 8),
+                const SizedBox(width: 8),
 
-              // Divider
-              Container(
-                width: 1,
-                height: 28,
-                color: AppColors.border,
-              ),
-              const SizedBox(width: 8),
+                // Divider
+                Container(
+                  width: 1,
+                  height: 28,
+                  color: AppColors.border,
+                ),
+                const SizedBox(width: 8),
 
-              // Template picker
-              _ToolButton(
-                icon: Icons.grid_view,
-                isActive: toolState.template != TemplateType.blank,
-                activeColor: AppColors.accentPurple,
-                onTap: () => showTemplatePicker(context, ref),
-                tooltip: 'Template',
-              ),
-            ],
+                // Template picker
+                _ToolButton(
+                  icon: Icons.grid_view,
+                  isActive: toolState.template != TemplateType.blank,
+                  activeColor: AppColors.accentPurple,
+                  onTap: () => showTemplatePicker(context, ref),
+                  tooltip: 'Template',
+                ),
+              ],
+            ),
           ),
         ),
       ),
