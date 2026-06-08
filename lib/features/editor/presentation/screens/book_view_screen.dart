@@ -19,6 +19,9 @@ import '../../domain/undo_redo/stroke_add_command.dart';
 import '../../data/storage/ink_file_storage.dart';
 import '../../data/storage/page_cache_manager.dart';
 import '../../data/storage/page_thumbnail_service.dart';
+import '../shape_notifier.dart';
+import '../../domain/models/shape_element.dart';
+import '../../data/repositories/shape_repository.dart';
 
 class BookViewScreen extends ConsumerStatefulWidget {
   final int notebookId;
@@ -43,7 +46,7 @@ class _BookViewScreenState extends ConsumerState<BookViewScreen> with WidgetsBin
       ref.read(pageProvider(widget.notebookId).notifier).initialize().then((_) {
         final totalPages = ref.read(pageProvider(widget.notebookId)).pages.length;
         ref.read(bookViewProvider(totalPages).notifier).updateTotalPages(totalPages);
-        _loadCurrentSpread(0, {});
+        _loadCurrentSpread(0, {}, {});
       });
     });
   }
@@ -71,7 +74,7 @@ class _BookViewScreenState extends ConsumerState<BookViewScreen> with WidgetsBin
     });
   }
 
-  Future<void> _forceSave({int? overrideSpread, Map<int, List<Stroke>>? overrideStrokes}) async {
+  Future<void> _forceSave({int? overrideSpread, Map<int, List<Stroke>>? overrideStrokes, Map<int, List<ShapeElement>>? overrideShapes}) async {
     if (_isSaving) return;
     _isSaving = true;
 
@@ -90,6 +93,7 @@ class _BookViewScreenState extends ConsumerState<BookViewScreen> with WidgetsBin
     for (final pageIndex in spreadPages) {
       if (pageIndex >= 0 && pageIndex < totalPages) {
         final strokes = overrideStrokes?[pageIndex] ?? ref.read(canvasStateProvider(pageIndex)).completedStrokes;
+        final shapes = overrideShapes?[pageIndex] ?? ref.read(shapeProvider(pageIndex)).shapes;
         final importedState = ref.read(importedContentProvider(pageIndex));
         
         await InkFileStorage.saveStrokes(
@@ -97,12 +101,15 @@ class _BookViewScreenState extends ConsumerState<BookViewScreen> with WidgetsBin
           pageId: pageIndex,
           strokes: strokes,
         );
+        await ShapeRepository().saveShapesForPage(widget.notebookId, pageIndex, shapes);
+        
         PageThumbnailService.generateAndSave(
           widget.notebookId, 
           pageIndex, 
           strokes, 
           importedState.contents,
           importedState.loadedImages,
+          shapes,
           size,
         );
       }
@@ -111,8 +118,8 @@ class _BookViewScreenState extends ConsumerState<BookViewScreen> with WidgetsBin
     _isSaving = false;
   }
 
-  Future<void> _loadCurrentSpread(int oldSpread, Map<int, List<Stroke>> oldStrokes) async {
-    await _forceSave(overrideSpread: oldSpread, overrideStrokes: oldStrokes);
+  Future<void> _loadCurrentSpread(int oldSpread, Map<int, List<Stroke>> oldStrokes, Map<int, List<ShapeElement>> oldShapes) async {
+    await _forceSave(overrideSpread: oldSpread, overrideStrokes: oldStrokes, overrideShapes: oldShapes);
 
     final pageState = ref.read(pageProvider(widget.notebookId));
     final totalPages = pageState.pages.length;
@@ -123,7 +130,9 @@ class _BookViewScreenState extends ConsumerState<BookViewScreen> with WidgetsBin
     for (final pageIndex in spreadPages) {
       if (pageIndex >= 0 && pageIndex < totalPages) {
         ref.read(canvasStateProvider(pageIndex).notifier).loadStrokes([]);
+        ref.read(shapeProvider(pageIndex).notifier).clearShapes();
         ref.read(importedContentProvider(pageIndex).notifier).loadForPage(widget.notebookId);
+        ref.read(shapeProvider(pageIndex).notifier).loadForPage(widget.notebookId);
         final pageData = await _cacheManager.getPage(widget.notebookId, pageIndex);
         if (mounted) {
           ref.read(canvasStateProvider(pageIndex).notifier).loadStrokes(pageData.strokes);
@@ -142,12 +151,14 @@ class _BookViewScreenState extends ConsumerState<BookViewScreen> with WidgetsBin
         // Read old strokes synchronously before the autoDispose provider is destroyed
         final oldSpreadPages = ref.read(bookViewProvider(totalPages).notifier).calculateSpreadPages(previous.currentSpread);
         final oldStrokes = <int, List<Stroke>>{};
+        final oldShapes = <int, List<ShapeElement>>{};
         for (final p in oldSpreadPages) {
           if (p >= 0 && p < totalPages) {
             oldStrokes[p] = ref.read(canvasStateProvider(p)).completedStrokes;
+            oldShapes[p] = ref.read(shapeProvider(p)).shapes;
           }
         }
-        _loadCurrentSpread(previous.currentSpread, oldStrokes);
+        _loadCurrentSpread(previous.currentSpread, oldStrokes, oldShapes);
       }
     });
 
@@ -246,11 +257,12 @@ class EditablePagePane extends ConsumerWidget {
     final canvasState = ref.watch(canvasStateProvider(pageIndex));
     final toolState = ref.watch(toolProvider);
     final importedState = ref.watch(importedContentProvider(pageIndex));
+    final shapeState = ref.watch(shapeProvider(pageIndex));
 
     return Stack(
       children: [
         RawPointerListener(
-          onPointerDown: (point) {
+          onPointerDown: (event, point) {
             if (toolState.isEraser && toolState.eraserType == EraserType.stroke) {
               ref.read(canvasStateProvider(pageIndex).notifier).eraseAtPoint(point, toolState.size * 2);
               onAutosaveTriggered();
@@ -258,7 +270,7 @@ class EditablePagePane extends ConsumerWidget {
               ref.read(canvasStateProvider(pageIndex).notifier).addPoint(point);
             }
           },
-          onPointerMove: (point) {
+          onPointerMove: (event, point) {
             if (toolState.isEraser && toolState.eraserType == EraserType.stroke) {
               ref.read(canvasStateProvider(pageIndex).notifier).eraseAtPoint(point, toolState.size * 2);
               onAutosaveTriggered();
@@ -266,7 +278,7 @@ class EditablePagePane extends ConsumerWidget {
               ref.read(canvasStateProvider(pageIndex).notifier).addPoint(point);
             }
           },
-          onPointerUp: () {
+          onPointerUp: (event, point) {
             if (!toolState.isEraser || toolState.eraserType == EraserType.pixel) {
               ref.read(canvasStateProvider(pageIndex).notifier).finishStroke(
                     toolState.color,
@@ -296,6 +308,7 @@ class EditablePagePane extends ConsumerWidget {
             importedContentState: importedState,
             isEraser: toolState.isEraser,
             templateType: toolState.template,
+            shapes: shapeState.shapes,
           ),
         ),
         FreeImageOverlay(notebookId: notebookId, pageIndex: pageIndex),

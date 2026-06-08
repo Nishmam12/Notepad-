@@ -54,7 +54,7 @@ class _ToolBarState extends ConsumerState<ToolBar> {
                 // Pen tool
                 _ToolButton(
                   icon: Icons.edit,
-                  isActive: !toolState.isEraser,
+                  isActive: toolState.activeTool == ToolType.pen,
                   activeColor: AppColors.accent,
                   onTap: () => ref.read(toolProvider.notifier).setPen(),
                   tooltip: 'Pen',
@@ -66,10 +66,10 @@ class _ToolBarState extends ConsumerState<ToolBar> {
                   icon: toolState.eraserType == EraserType.pixel 
                       ? Icons.layers_clear 
                       : Icons.auto_fix_high,
-                  isActive: toolState.isEraser,
+                  isActive: toolState.activeTool == ToolType.eraser,
                   activeColor: AppColors.accentYellow,
                   onTap: () {
-                    if (toolState.isEraser) {
+                    if (toolState.activeTool == ToolType.eraser) {
                       ref.read(toolProvider.notifier).toggleEraserType();
                     } else {
                       ref.read(toolProvider.notifier).setEraser();
@@ -78,6 +78,26 @@ class _ToolBarState extends ConsumerState<ToolBar> {
                   tooltip: toolState.eraserType == EraserType.pixel 
                       ? 'Pixel Eraser' 
                       : 'Stroke Eraser',
+                ),
+                const SizedBox(width: 4),
+                
+                // Shape tool
+                _ToolButton(
+                  icon: Icons.category_outlined,
+                  isActive: toolState.activeTool == ToolType.shape,
+                  activeColor: AppColors.accentGreen,
+                  onTap: () => ref.read(toolProvider.notifier).setShapeTool(),
+                  tooltip: 'Shapes',
+                ),
+                const SizedBox(width: 4),
+                
+                // Lasso tool
+                _ToolButton(
+                  icon: Icons.gesture,
+                  isActive: toolState.activeTool == ToolType.lasso,
+                  activeColor: AppColors.accentPurple,
+                  onTap: () => ref.read(toolProvider.notifier).setLassoTool(),
+                  tooltip: 'Lasso Selection',
                 ),
                 const SizedBox(width: 8),
 

@@ -5,14 +5,13 @@ import 'package:flutter/material.dart';
 import '../../../domain/models/stroke_point.dart';
 
 /// Callback types for pointer event handling.
-typedef PointerPointCallback = void Function(StrokePoint point);
-typedef PointerEndCallback = void Function();
+typedef PointerEventCallback = void Function(PointerEvent event, StrokePoint point);
 
 class RawPointerListener extends StatelessWidget {
   final Widget child;
-  final PointerPointCallback onPointerDown;
-  final PointerPointCallback onPointerMove;
-  final PointerEndCallback onPointerUp;
+  final PointerEventCallback onPointerDown;
+  final PointerEventCallback onPointerMove;
+  final PointerEventCallback onPointerUp;
 
   const RawPointerListener({
     super.key,
@@ -27,17 +26,19 @@ class RawPointerListener extends StatelessWidget {
     return Listener(
       onPointerDown: (event) {
         final point = _extractPoint(event);
-        onPointerDown(point);
+        onPointerDown(event, point);
       },
       onPointerMove: (event) {
         final point = _extractPoint(event);
-        onPointerMove(point);
+        onPointerMove(event, point);
       },
-      onPointerUp: (_) {
-        onPointerUp();
+      onPointerUp: (event) {
+        final point = _extractPoint(event);
+        onPointerUp(event, point);
       },
-      onPointerCancel: (_) {
-        onPointerUp();
+      onPointerCancel: (event) {
+        final point = _extractPoint(event);
+        onPointerUp(event, point);
       },
       behavior: HitTestBehavior.opaque,
       child: child,

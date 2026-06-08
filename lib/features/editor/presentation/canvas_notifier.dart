@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../domain/models/stroke.dart';
 import '../domain/models/stroke_point.dart';
 import '../domain/models/template_type.dart';
+import '../domain/models/shape_type.dart';
 
 /// Immutable state for the canvas.
 class CanvasState {
@@ -33,6 +34,14 @@ enum EraserType {
   pixel,
 }
 
+enum ToolType {
+  pen,
+  eraser,
+  shape,
+  lasso,
+}
+
+
 /// Immutable state for the active drawing tool.
 class ToolState {
   final Color color;
@@ -41,6 +50,8 @@ class ToolState {
   final bool isEraser;
   final EraserType eraserType;
   final TemplateType template;
+  final ToolType activeTool;
+  final ShapeType selectedShapeType;
 
   const ToolState({
     this.color = Colors.black,
@@ -49,6 +60,8 @@ class ToolState {
     this.isEraser = false,
     this.eraserType = EraserType.stroke,
     this.template = TemplateType.blank,
+    this.activeTool = ToolType.pen,
+    this.selectedShapeType = ShapeType.line,
   });
 
   factory ToolState.initial() => const ToolState();
@@ -60,6 +73,8 @@ class ToolState {
     bool? isEraser,
     EraserType? eraserType,
     TemplateType? template,
+    ToolType? activeTool,
+    ShapeType? selectedShapeType,
   }) {
     return ToolState(
       color: color ?? this.color,
@@ -68,6 +83,8 @@ class ToolState {
       isEraser: isEraser ?? this.isEraser,
       eraserType: eraserType ?? this.eraserType,
       template: template ?? this.template,
+      activeTool: activeTool ?? this.activeTool,
+      selectedShapeType: selectedShapeType ?? this.selectedShapeType,
     );
   }
 }
@@ -195,8 +212,11 @@ class ToolNotifier extends StateNotifier<ToolState> {
           : EraserType.stroke,
     );
   }
-  void setPen() => state = state.copyWith(isEraser: false);
-  void setEraser() => state = state.copyWith(isEraser: true);
+  void setPen() => state = state.copyWith(isEraser: false, activeTool: ToolType.pen);
+  void setEraser() => state = state.copyWith(isEraser: true, activeTool: ToolType.eraser);
+  void setShapeTool() => state = state.copyWith(isEraser: false, activeTool: ToolType.shape);
+  void setLassoTool() => state = state.copyWith(isEraser: false, activeTool: ToolType.lasso);
+  void setShapeType(ShapeType type) => state = state.copyWith(selectedShapeType: type);
   void setTemplate(TemplateType template) =>
       state = state.copyWith(template: template);
 }

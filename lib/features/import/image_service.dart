@@ -7,6 +7,8 @@ import 'package:path_provider/path_provider.dart';
 
 import '../../core/constants/storage_paths.dart';
 import '../editor/domain/models/imported_content.dart';
+import 'package:file_picker/file_picker.dart';
+import '../editor/domain/models/shape_element.dart';
 import '../editor/data/storage/pdf_cache_manager.dart'; // We can use PdfCacheManager for image memory cache
 import 'pdf_service.dart'; // For ImportException
 
@@ -33,6 +35,31 @@ class ImageService {
     final xFile = await _picker.pickImage(source: ImageSource.camera);
     if (xFile == null) return null; // User cancelled
     return _processAndSaveImage(xFile.path, notebookId);
+  }
+
+  Future<ShapeElement?> pickSvg(String notebookId) async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['svg'],
+    );
+    if (result == null || result.files.single.path == null) return null;
+
+    final sourcePath = result.files.single.path!;
+    final id = DateTime.now().microsecondsSinceEpoch.toString();
+    final relativePath = 'notebooks/$notebookId/imports/svg_$id.svg';
+    
+    final docsDir = await getApplicationDocumentsDirectory();
+    final absoluteDestPath = '${docsDir.path}/$relativePath';
+
+    final destFile = File(absoluteDestPath);
+    await destFile.parent.create(recursive: true);
+    await File(sourcePath).copy(absoluteDestPath);
+
+    return ShapeElement.svgImage(
+      id: id,
+      rect: const ui.Rect.fromLTWH(100, 100, 200, 200),
+      svgRelativePath: relativePath,
+    )..zOrder = DateTime.now().millisecondsSinceEpoch;
   }
 
   Future<ImportedContent?> _processAndSaveImage(String sourcePath, String notebookId) async {

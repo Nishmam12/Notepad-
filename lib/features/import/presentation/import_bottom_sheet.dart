@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '../image_service.dart';
 import '../../editor/presentation/imported_content_notifier.dart';
+import '../../editor/presentation/shape_notifier.dart';
+import '../../../core/constants/app_colors.dart';
 
 class ImportBottomSheet extends ConsumerWidget {
   final int notebookId;
@@ -59,6 +61,27 @@ class ImportBottomSheet extends ConsumerWidget {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text('Failed to import image: $e')),
+                  );
+                }
+              }
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.draw_outlined, color: AppColors.accentPurple),
+            title: const Text('Import SVG'),
+            subtitle: const Text('Place vector graphic on current page'),
+            onTap: () async {
+              Navigator.of(context).pop();
+              final service = ImageService(ref.read(pdfCacheManagerProvider));
+              try {
+                final shape = await service.pickSvg(notebookId.toString());
+                if (shape != null) {
+                  ref.read(shapeProvider(pageIndex).notifier).addShape(shape);
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Failed to import SVG: $e')),
                   );
                 }
               }

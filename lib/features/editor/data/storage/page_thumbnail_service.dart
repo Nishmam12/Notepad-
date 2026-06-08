@@ -7,6 +7,9 @@ import 'package:perfect_freehand/perfect_freehand.dart';
 
 import '../../domain/models/stroke.dart';
 import '../../domain/models/imported_content.dart';
+import '../../domain/models/shape_element.dart';
+import '../../domain/models/shape_type.dart';
+import '../../domain/services/shape_geometry.dart';
 
 class PageThumbnailService {
   static Future<String> _thumbnailPath(int notebookId, int pageIndex) async {
@@ -23,6 +26,7 @@ class PageThumbnailService {
     List<Stroke> strokes,
     List<ImportedContent> contents,
     Map<String, ui.Image> loadedImages,
+    List<ShapeElement> shapes,
     ui.Size size,
   ) async {
     // 1. Render to image on main thread (very fast, GPU backed)
@@ -93,6 +97,47 @@ class PageThumbnailService {
       }
 
       canvas.drawPath(path, paint);
+    }
+
+    // Draw shapes (Layer 4)
+    for (final shape in shapes) {
+      if (shape.geometryData.isEmpty) continue;
+
+      final paint = ui.Paint()
+        ..color = ui.Color(shape.color).withValues(alpha: shape.opacity)
+        ..style = shape.hasFill ? ui.PaintingStyle.fill : ui.PaintingStyle.stroke
+        ..strokeWidth = shape.strokeWidth
+        ..strokeCap = ui.StrokeCap.round
+        ..strokeJoin = ui.StrokeJoin.round;
+
+      if (shape.type == ShapeType.circle) {
+        final rect = ShapeGeometry.rectFromGeometry(shape.geometryData);
+        canvas.drawOval(rect, paint);
+      } else if (shape.type == ShapeType.rectangle) {
+        final rect = ShapeGeometry.rectFromGeometry(shape.geometryData);
+        canvas.drawRect(rect, paint);
+      } else if (shape.type == ShapeType.line || shape.type == ShapeType.arrow) {
+        if (shape.geometryData.length >= 4) {
+          canvas.drawLine(
+            ui.Offset(shape.geometryData[0], shape.geometryData[1]),
+            ui.Offset(shape.geometryData[2], shape.geometryData[3]),
+            paint,
+          );
+        }
+      } else if (shape.type == ShapeType.triangle || shape.type == ShapeType.polygon) {
+        final pts = ShapeGeometry.verticesFromGeometry(shape.geometryData);
+        if (pts.length >= 3) {
+          final path = ui.Path()..moveTo(pts[0].dx, pts[0].dy);
+          for (int i = 1; i < pts.length; i++) {
+            path.lineTo(pts[i].dx, pts[i].dy);
+          }
+          path.close();
+          canvas.drawPath(path, paint);
+        }
+      } else if (shape.type == ShapeType.textBox || shape.type == ShapeType.svgImage) {
+         final rect = ShapeGeometry.rectFromGeometry(shape.geometryData);
+         canvas.drawRect(rect, ui.Paint()..color = ui.Color(shape.color).withValues(alpha: 0.3)..style = ui.PaintingStyle.stroke);
+      }
     }
 
     final picture = recorder.endRecording();

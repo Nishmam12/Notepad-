@@ -42,6 +42,12 @@ const NotePageSchema = CollectionSchema(
       id: 4,
       name: r'pageIndex',
       type: IsarType.long,
+    ),
+    r'shapes': PropertySchema(
+      id: 5,
+      name: r'shapes',
+      type: IsarType.objectList,
+      target: r'ShapeElement',
     )
   },
   estimateSize: _notePageEstimateSize,
@@ -65,7 +71,10 @@ const NotePageSchema = CollectionSchema(
     )
   },
   links: {},
-  embeddedSchemas: {r'ImportedContent': ImportedContentSchema},
+  embeddedSchemas: {
+    r'ImportedContent': ImportedContentSchema,
+    r'ShapeElement': ShapeElementSchema
+  },
   getId: _notePageGetId,
   getLinks: _notePageGetLinks,
   attach: _notePageAttach,
@@ -87,6 +96,14 @@ int _notePageEstimateSize(
           ImportedContentSchema.estimateSize(value, offsets, allOffsets);
     }
   }
+  bytesCount += 3 + object.shapes.length * 3;
+  {
+    final offsets = allOffsets[ShapeElement]!;
+    for (var i = 0; i < object.shapes.length; i++) {
+      final value = object.shapes[i];
+      bytesCount += ShapeElementSchema.estimateSize(value, offsets, allOffsets);
+    }
+  }
   return bytesCount;
 }
 
@@ -106,6 +123,12 @@ void _notePageSerialize(
   writer.writeDateTime(offsets[2], object.modifiedAt);
   writer.writeLong(offsets[3], object.notebookId);
   writer.writeLong(offsets[4], object.pageIndex);
+  writer.writeObjectList<ShapeElement>(
+    offsets[5],
+    allOffsets,
+    ShapeElementSchema.serialize,
+    object.shapes,
+  );
 }
 
 NotePage _notePageDeserialize(
@@ -127,6 +150,13 @@ NotePage _notePageDeserialize(
   object.modifiedAt = reader.readDateTime(offsets[2]);
   object.notebookId = reader.readLong(offsets[3]);
   object.pageIndex = reader.readLong(offsets[4]);
+  object.shapes = reader.readObjectList<ShapeElement>(
+        offsets[5],
+        ShapeElementSchema.deserialize,
+        allOffsets,
+        ShapeElement(),
+      ) ??
+      [];
   return object;
 }
 
@@ -153,6 +183,14 @@ P _notePageDeserializeProp<P>(
       return (reader.readLong(offset)) as P;
     case 4:
       return (reader.readLong(offset)) as P;
+    case 5:
+      return (reader.readObjectList<ShapeElement>(
+            offset,
+            ShapeElementSchema.deserialize,
+            allOffsets,
+            ShapeElement(),
+          ) ??
+          []) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
   }
@@ -697,6 +735,91 @@ extension NotePageQueryFilter
       ));
     });
   }
+
+  QueryBuilder<NotePage, NotePage, QAfterFilterCondition> shapesLengthEqualTo(
+      int length) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'shapes',
+        length,
+        true,
+        length,
+        true,
+      );
+    });
+  }
+
+  QueryBuilder<NotePage, NotePage, QAfterFilterCondition> shapesIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'shapes',
+        0,
+        true,
+        0,
+        true,
+      );
+    });
+  }
+
+  QueryBuilder<NotePage, NotePage, QAfterFilterCondition> shapesIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'shapes',
+        0,
+        false,
+        999999,
+        true,
+      );
+    });
+  }
+
+  QueryBuilder<NotePage, NotePage, QAfterFilterCondition> shapesLengthLessThan(
+    int length, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'shapes',
+        0,
+        true,
+        length,
+        include,
+      );
+    });
+  }
+
+  QueryBuilder<NotePage, NotePage, QAfterFilterCondition>
+      shapesLengthGreaterThan(
+    int length, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'shapes',
+        length,
+        include,
+        999999,
+        true,
+      );
+    });
+  }
+
+  QueryBuilder<NotePage, NotePage, QAfterFilterCondition> shapesLengthBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'shapes',
+        lower,
+        includeLower,
+        upper,
+        includeUpper,
+      );
+    });
+  }
 }
 
 extension NotePageQueryObject
@@ -705,6 +828,13 @@ extension NotePageQueryObject
       importedContentsElement(FilterQuery<ImportedContent> q) {
     return QueryBuilder.apply(this, (query) {
       return query.object(q, r'importedContents');
+    });
+  }
+
+  QueryBuilder<NotePage, NotePage, QAfterFilterCondition> shapesElement(
+      FilterQuery<ShapeElement> q) {
+    return QueryBuilder.apply(this, (query) {
+      return query.object(q, r'shapes');
     });
   }
 }
@@ -888,6 +1018,13 @@ extension NotePageQueryProperty
   QueryBuilder<NotePage, int, QQueryOperations> pageIndexProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'pageIndex');
+    });
+  }
+
+  QueryBuilder<NotePage, List<ShapeElement>, QQueryOperations>
+      shapesProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'shapes');
     });
   }
 }

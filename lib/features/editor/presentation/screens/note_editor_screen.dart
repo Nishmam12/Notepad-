@@ -21,6 +21,21 @@ import '../../domain/undo_redo/stroke_add_command.dart';
 import '../../data/storage/ink_file_storage.dart';
 import '../../data/storage/page_cache_manager.dart';
 import '../../data/storage/page_thumbnail_service.dart';
+import '../../domain/models/shape_type.dart';
+import '../../domain/models/shape_element.dart';
+import '../../domain/services/shape_geometry.dart';
+import '../shape_notifier.dart';
+import '../selection_notifier.dart';
+import '../../domain/undo_redo/shape_add_command.dart';
+import '../canvas/input/shape_input_handler.dart';
+import '../canvas/input/lasso_input_handler.dart';
+import '../widgets/shape_toolbar.dart';
+import '../widgets/selection_overlay.dart' as app_sel;
+import '../widgets/text_box_overlay.dart';
+
+final lassoPreviewProvider = StateProvider.autoDispose<List<Offset>>((ref) => []);
+final activeTextBoxProvider = StateProvider.autoDispose<ShapeElement?>((ref) => null);
+final textBoxRectProvider = StateProvider.autoDispose<Rect?>((ref) => null);
 
 class NoteEditorScreen extends ConsumerStatefulWidget {
   final int notebookId;
@@ -46,7 +61,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> with Widget
       ref.read(pageProvider(widget.notebookId).notifier).initialize().then((_) {
         // For the very first load, old and new are both 0.
         // We can just pass empty list for oldStrokes since there's nothing to save yet.
-        _performPageSwitchLoad(0, 0, []);
+        _performPageSwitchLoad(0, 0, [], []);
         ref.read(importedContentProvider(0).notifier).loadForPage(widget.notebookId);
       });
     });
@@ -75,13 +90,14 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> with Widget
     });
   }
 
-  Future<void> _forceSave({int? pageIndexOverride, List<Stroke>? strokesOverride}) async {
+  Future<void> _forceSave({int? pageIndexOverride, List<Stroke>? strokesOverride, List<ShapeElement>? shapesOverride}) async {
     if (_isSaving) return;
     _isSaving = true;
 
     final pageState = ref.read(pageProvider(widget.notebookId));
     final currentIndex = pageIndexOverride ?? pageState.currentPageIndex;
     final strokes = strokesOverride ?? ref.read(canvasStateProvider(currentIndex)).completedStrokes;
+    final shapes = shapesOverride ?? ref.read(shapeProvider(currentIndex)).shapes;
     
     if (pageState.pages.isNotEmpty) {
       final size = MediaQuery.of(context).size;
@@ -93,6 +109,8 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> with Widget
         strokes: strokes,
       );
       
+      await ShapeRepository().saveShapesForPage(widget.notebookId, currentIndex, shapes);
+      
       // Update the thumbnail for the navigator in the background
       PageThumbnailService.generateAndSave(
         widget.notebookId, 
@@ -100,6 +118,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> with Widget
         strokes, 
         importedState.contents,
         importedState.loadedImages,
+        shapes,
         size,
       );
       
@@ -111,12 +130,13 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> with Widget
   }
 
   /// Implements the strict 7-step sequence for switching pages
-  Future<void> _performPageSwitchLoad(int oldPageIndex, int newPageIndex, List<Stroke> oldStrokes) async {
+  Future<void> _performPageSwitchLoad(int oldPageIndex, int newPageIndex, List<Stroke> oldStrokes, List<ShapeElement> oldShapes) async {
     // 1. Autosave current
-    await _forceSave(pageIndexOverride: oldPageIndex, strokesOverride: oldStrokes);
+    await _forceSave(pageIndexOverride: oldPageIndex, strokesOverride: oldStrokes, shapesOverride: oldShapes);
     
     // 2. Clear canvas to prevent ghosting
     ref.read(canvasStateProvider(newPageIndex).notifier).loadStrokes([]);
+    ref.read(shapeProvider(newPageIndex).notifier).clearShapes();
     
     // 3. Load target page from cache/disk
     final pageData = await _cacheManager.getPage(widget.notebookId, newPageIndex);
@@ -125,6 +145,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> with Widget
     if (mounted) {
       ref.read(canvasStateProvider(newPageIndex).notifier).loadStrokes(pageData.strokes);
       ref.read(importedContentProvider(newPageIndex).notifier).loadForPage(widget.notebookId);
+      ref.read(shapeProvider(newPageIndex).notifier).loadForPage(widget.notebookId);
     }
     
     // 5. Preload adjacent pages
@@ -138,13 +159,67 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> with Widget
     final canvasState = ref.watch(canvasStateProvider(currentIndex));
     final importedState = ref.watch(importedContentProvider(currentIndex));
     final toolState = ref.watch(toolProvider);
+    final shapeState = ref.watch(shapeProvider(currentIndex));
+    final selectionState = ref.watch(selectionProvider);
+    final lassoPreviewPath = ref.watch(lassoPreviewProvider);
+    final activeTextBox = ref.watch(activeTextBoxProvider);
+    final textBoxRect = ref.watch(textBoxRectProvider);
+
+    final shapeInputHandler = ShapeInputHandler(
+      onShapeRecognised: (ShapeElement shape) {
+        if (shape.type == ShapeType.textBox) {
+          ref.read(textBoxRectProvider.notifier).state = ShapeGeometry.rectFromGeometry(shape.geometryData);
+        } else {
+          ref.read(shapeProvider(currentIndex).notifier).addShape(shape);
+          final command = ShapeAddCommand(
+            shapeNotifier: ref.read(shapeProvider(currentIndex).notifier),
+            shape: shape,
+          );
+          ref.read(undoRedoProvider(currentIndex).notifier).push(command);
+        }
+        _triggerAutosave();
+      },
+      onShapeFallback: (List<StrokePoint> points) {
+        final stroke = Stroke(
+          id: DateTime.now().microsecondsSinceEpoch.toString(),
+          color: toolState.color.toARGB32(),
+          size: toolState.size,
+          opacity: toolState.opacity,
+          isEraser: false,
+          points: points,
+        );
+        ref.read(canvasStateProvider(currentIndex).notifier).addStroke(stroke);
+        final command = StrokeAddCommand(
+          canvasNotifier: ref.read(canvasStateProvider(currentIndex).notifier),
+          stroke: stroke,
+        );
+        ref.read(undoRedoProvider(currentIndex).notifier).push(command);
+        _triggerAutosave();
+      },
+      toolState: toolState,
+    );
+
+    final lassoInputHandler = LassoInputHandler(
+      onLassoComplete: (LassoHitResult result, Rect bounds) {
+        ref.read(selectionProvider.notifier).setSelection(
+          result,
+          bounds,
+        );
+      },
+      onLassoUpdate: (List<Offset> path) {
+        ref.read(lassoPreviewProvider.notifier).state = path;
+      },
+      currentStrokes: canvasState.completedStrokes,
+      currentShapes: shapeState.shapes,
+    );
     
     // Listen for page index changes to trigger the switch sequence
     ref.listen<PageState>(pageProvider(widget.notebookId), (previous, next) {
       if (previous != null && previous.currentPageIndex != next.currentPageIndex) {
         // Read old strokes synchronously before the autoDispose provider is destroyed
         final oldStrokes = ref.read(canvasStateProvider(previous.currentPageIndex)).completedStrokes;
-        _performPageSwitchLoad(previous.currentPageIndex, next.currentPageIndex, oldStrokes);
+        final oldShapes = ref.read(shapeProvider(previous.currentPageIndex)).shapes;
+        _performPageSwitchLoad(previous.currentPageIndex, next.currentPageIndex, oldStrokes, oldShapes);
       }
     });
 
@@ -194,24 +269,36 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> with Widget
               child: Stack(
                 children: [
                   RawPointerListener(
-                    onPointerDown: (point) {
-                      if (toolState.isEraser && toolState.eraserType == EraserType.stroke) {
+                    onPointerDown: (event, point) {
+                      if (toolState.activeTool == ToolType.shape) {
+                        shapeInputHandler.onPointerDown(event as PointerDownEvent);
+                      } else if (toolState.activeTool == ToolType.lasso) {
+                        lassoInputHandler.onPointerDown(event as PointerDownEvent);
+                      } else if (toolState.isEraser && toolState.eraserType == EraserType.stroke) {
                         ref.read(canvasStateProvider(currentIndex).notifier).eraseAtPoint(point, toolState.size * 2);
                         _triggerAutosave();
                       } else {
                         ref.read(canvasStateProvider(currentIndex).notifier).addPoint(point);
                       }
                     },
-                    onPointerMove: (point) {
-                      if (toolState.isEraser && toolState.eraserType == EraserType.stroke) {
+                    onPointerMove: (event, point) {
+                      if (toolState.activeTool == ToolType.shape) {
+                        shapeInputHandler.onPointerMove(event as PointerMoveEvent);
+                      } else if (toolState.activeTool == ToolType.lasso) {
+                        lassoInputHandler.onPointerMove(event as PointerMoveEvent);
+                      } else if (toolState.isEraser && toolState.eraserType == EraserType.stroke) {
                         ref.read(canvasStateProvider(currentIndex).notifier).eraseAtPoint(point, toolState.size * 2);
                         _triggerAutosave();
                       } else {
                         ref.read(canvasStateProvider(currentIndex).notifier).addPoint(point);
                       }
                     },
-                    onPointerUp: () {
-                      if (!toolState.isEraser || toolState.eraserType == EraserType.pixel) {
+                    onPointerUp: (event, point) {
+                      if (toolState.activeTool == ToolType.shape) {
+                        shapeInputHandler.onPointerUp(event as PointerUpEvent);
+                      } else if (toolState.activeTool == ToolType.lasso) {
+                        lassoInputHandler.onPointerUp(event as PointerUpEvent);
+                      } else if (!toolState.isEraser || toolState.eraserType == EraserType.pixel) {
                         ref.read(canvasStateProvider(currentIndex).notifier).finishStroke(
                               toolState.color,
                               toolState.size,
@@ -240,9 +327,25 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> with Widget
                       importedContentState: importedState,
                       isEraser: toolState.isEraser,
                       templateType: toolState.template,
+                      shapes: shapeState.shapes,
+                      selectionState: selectionState,
+                      lassoPreviewPath: lassoPreviewPath,
                     ),
                   ),
                   FreeImageOverlay(notebookId: widget.notebookId, pageIndex: currentIndex),
+                  app_sel.SelectionOverlay(pageIndex: currentIndex),
+                  if (activeTextBox != null || textBoxRect != null)
+                    TextBoxOverlay(
+                      pageIndex: currentIndex,
+                      existingShape: activeTextBox,
+                      initialRect: textBoxRect,
+                      colorValue: toolState.color.value,
+                      onCommit: () {
+                        ref.read(activeTextBoxProvider.notifier).state = null;
+                        ref.read(textBoxRectProvider.notifier).state = null;
+                      },
+                    ),
+                  const ShapeToolbar(),
                   ToolBar(notebookId: widget.notebookId, pageIndex: currentIndex),
                 ],
               ),

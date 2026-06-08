@@ -3,6 +3,7 @@
 import 'package:isar/isar.dart';
 
 import '../../../editor/domain/models/imported_content.dart';
+import '../../../editor/domain/models/shape_element.dart';
 
 part 'note_page.g.dart';
 
@@ -19,6 +20,8 @@ class NotePage {
 
   // Phase 4: Imported PDF backgrounds and free images
   List<ImportedContent> importedContents = [];
+  
+  List<ShapeElement> shapes = [];
 
   late DateTime modifiedAt;
   

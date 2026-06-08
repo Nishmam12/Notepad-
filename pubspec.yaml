@@ -35,7 +35,7 @@ dependencies:
   image: ^4.2.0
 
   # ── Vector Shapes (Phase 5) ──────────────────────────────
-  flutter_svg: ^2.0.10+1
+  flutter_svg: ^2.3.0
 
   # ── Export & Share (Phase 2) ─────────────────────────────
   printing: ^5.13.1

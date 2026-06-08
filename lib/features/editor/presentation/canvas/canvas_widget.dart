@@ -10,6 +10,10 @@ import 'layers/stroke_history_layer.dart';
 import 'layers/active_stroke_layer.dart';
 import 'layers/imported_content_layer.dart';
 import '../imported_content_notifier.dart';
+import '../../domain/models/shape_element.dart';
+import '../selection_notifier.dart';
+import 'layers/shape_layer.dart';
+import 'layers/selection_layer.dart';
 
 class CanvasWidget extends StatelessWidget {
   final List<Stroke> completedStrokes;
@@ -21,6 +25,9 @@ class CanvasWidget extends StatelessWidget {
   final Color backgroundColor;
   final bool isEraser;
   final TemplateType templateType;
+  final List<ShapeElement> shapes;
+  final SelectionState selectionState;
+  final List<Offset>? lassoPreviewPath;
 
   const CanvasWidget({
     super.key,
@@ -33,6 +40,9 @@ class CanvasWidget extends StatelessWidget {
     this.isEraser = false,
     this.backgroundColor = Colors.white,
     this.templateType = TemplateType.blank,
+    this.shapes = const [],
+    this.selectionState = const SelectionState(),
+    this.lassoPreviewPath,
   });
 
   @override
@@ -85,11 +95,26 @@ class CanvasWidget extends StatelessWidget {
           ),
         ),
 
-        // Layer 4: ShapeLayer — placeholder for Phase 5.
-        // Will hold vector shapes and text boxes.
+        // Layer 4: ShapeLayer
+        RepaintBoundary(
+          child: CustomPaint(
+            painter: ShapeLayer(
+              shapes: shapes,
+            ),
+            size: Size.infinite,
+          ),
+        ),
 
-        // Layer 5: SelectionLayer — placeholder for Phase 5.
-        // Will hold selection handles and UI overlay.
+        // Layer 5: SelectionLayer
+        RepaintBoundary(
+          child: CustomPaint(
+            painter: SelectionLayer(
+              selectionState: selectionState,
+              lassoPreviewPath: lassoPreviewPath,
+            ),
+            size: Size.infinite,
+          ),
+        ),
       ],
     );
   }
