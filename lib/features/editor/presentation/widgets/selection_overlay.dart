@@ -13,10 +13,7 @@ import '../shape_notifier.dart';
 class SelectionOverlay extends ConsumerStatefulWidget {
   final int pageIndex;
 
-  const SelectionOverlay({
-    Key? key,
-    required this.pageIndex,
-  }) : super(key: key);
+  const SelectionOverlay({super.key, required this.pageIndex});
 
   @override
   ConsumerState<SelectionOverlay> createState() => _SelectionOverlayState();
@@ -170,13 +167,7 @@ class _SelectionOverlayState extends ConsumerState<SelectionOverlay> {
     ref.read(selectionProvider.notifier).beginTransform();
   }
 
-  void _handlePanUpdate(DragUpdateDetails details) {
-    if (_dragStart != null) {
-      final delta = details.globalPosition - _dragStart!;
-      _dragStart = details.globalPosition;
-      ref.read(selectionProvider.notifier).moveSelection(delta);
-    }
-  }
+
 
   void _handleScaleUpdate(DragUpdateDetails details) {
     if (_dragStart != null && _initialBounds != null) {

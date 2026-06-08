@@ -17,23 +17,28 @@ const NotebookSchema = CollectionSchema(
   name: r'Notebook',
   id: -2129704860457895688,
   properties: {
-    r'createdAt': PropertySchema(
+    r'backgroundColor': PropertySchema(
       id: 0,
+      name: r'backgroundColor',
+      type: IsarType.long,
+    ),
+    r'createdAt': PropertySchema(
+      id: 1,
       name: r'createdAt',
       type: IsarType.dateTime,
     ),
     r'modifiedAt': PropertySchema(
-      id: 1,
+      id: 2,
       name: r'modifiedAt',
       type: IsarType.dateTime,
     ),
     r'pageCount': PropertySchema(
-      id: 2,
+      id: 3,
       name: r'pageCount',
       type: IsarType.long,
     ),
     r'title': PropertySchema(
-      id: 3,
+      id: 4,
       name: r'title',
       type: IsarType.string,
     )
@@ -82,10 +87,11 @@ void _notebookSerialize(
   List<int> offsets,
   Map<Type, List<int>> allOffsets,
 ) {
-  writer.writeDateTime(offsets[0], object.createdAt);
-  writer.writeDateTime(offsets[1], object.modifiedAt);
-  writer.writeLong(offsets[2], object.pageCount);
-  writer.writeString(offsets[3], object.title);
+  writer.writeLong(offsets[0], object.backgroundColor);
+  writer.writeDateTime(offsets[1], object.createdAt);
+  writer.writeDateTime(offsets[2], object.modifiedAt);
+  writer.writeLong(offsets[3], object.pageCount);
+  writer.writeString(offsets[4], object.title);
 }
 
 Notebook _notebookDeserialize(
@@ -95,11 +101,12 @@ Notebook _notebookDeserialize(
   Map<Type, List<int>> allOffsets,
 ) {
   final object = Notebook();
-  object.createdAt = reader.readDateTime(offsets[0]);
+  object.backgroundColor = reader.readLong(offsets[0]);
+  object.createdAt = reader.readDateTime(offsets[1]);
   object.id = id;
-  object.modifiedAt = reader.readDateTime(offsets[1]);
-  object.pageCount = reader.readLong(offsets[2]);
-  object.title = reader.readString(offsets[3]);
+  object.modifiedAt = reader.readDateTime(offsets[2]);
+  object.pageCount = reader.readLong(offsets[3]);
+  object.title = reader.readString(offsets[4]);
   return object;
 }
 
@@ -111,12 +118,14 @@ P _notebookDeserializeProp<P>(
 ) {
   switch (propertyId) {
     case 0:
-      return (reader.readDateTime(offset)) as P;
+      return (reader.readLong(offset)) as P;
     case 1:
       return (reader.readDateTime(offset)) as P;
     case 2:
-      return (reader.readLong(offset)) as P;
+      return (reader.readDateTime(offset)) as P;
     case 3:
+      return (reader.readLong(offset)) as P;
+    case 4:
       return (reader.readString(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -310,6 +319,62 @@ extension NotebookQueryWhere on QueryBuilder<Notebook, Notebook, QWhereClause> {
 
 extension NotebookQueryFilter
     on QueryBuilder<Notebook, Notebook, QFilterCondition> {
+  QueryBuilder<Notebook, Notebook, QAfterFilterCondition>
+      backgroundColorEqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'backgroundColor',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Notebook, Notebook, QAfterFilterCondition>
+      backgroundColorGreaterThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'backgroundColor',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Notebook, Notebook, QAfterFilterCondition>
+      backgroundColorLessThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'backgroundColor',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Notebook, Notebook, QAfterFilterCondition>
+      backgroundColorBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'backgroundColor',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
   QueryBuilder<Notebook, Notebook, QAfterFilterCondition> createdAtEqualTo(
       DateTime value) {
     return QueryBuilder.apply(this, (query) {
@@ -659,6 +724,18 @@ extension NotebookQueryLinks
     on QueryBuilder<Notebook, Notebook, QFilterCondition> {}
 
 extension NotebookQuerySortBy on QueryBuilder<Notebook, Notebook, QSortBy> {
+  QueryBuilder<Notebook, Notebook, QAfterSortBy> sortByBackgroundColor() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'backgroundColor', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Notebook, Notebook, QAfterSortBy> sortByBackgroundColorDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'backgroundColor', Sort.desc);
+    });
+  }
+
   QueryBuilder<Notebook, Notebook, QAfterSortBy> sortByCreatedAt() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'createdAt', Sort.asc);
@@ -710,6 +787,18 @@ extension NotebookQuerySortBy on QueryBuilder<Notebook, Notebook, QSortBy> {
 
 extension NotebookQuerySortThenBy
     on QueryBuilder<Notebook, Notebook, QSortThenBy> {
+  QueryBuilder<Notebook, Notebook, QAfterSortBy> thenByBackgroundColor() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'backgroundColor', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Notebook, Notebook, QAfterSortBy> thenByBackgroundColorDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'backgroundColor', Sort.desc);
+    });
+  }
+
   QueryBuilder<Notebook, Notebook, QAfterSortBy> thenByCreatedAt() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'createdAt', Sort.asc);
@@ -773,6 +862,12 @@ extension NotebookQuerySortThenBy
 
 extension NotebookQueryWhereDistinct
     on QueryBuilder<Notebook, Notebook, QDistinct> {
+  QueryBuilder<Notebook, Notebook, QDistinct> distinctByBackgroundColor() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'backgroundColor');
+    });
+  }
+
   QueryBuilder<Notebook, Notebook, QDistinct> distinctByCreatedAt() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'createdAt');
@@ -804,6 +899,12 @@ extension NotebookQueryProperty
   QueryBuilder<Notebook, int, QQueryOperations> idProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'id');
+    });
+  }
+
+  QueryBuilder<Notebook, int, QQueryOperations> backgroundColorProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'backgroundColor');
     });
   }
 

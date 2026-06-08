@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../domain/models/shape_element.dart';
-import '../../domain/models/shape_type.dart';
 import '../../domain/services/shape_geometry.dart';
 import '../shape_notifier.dart';
 import '../../domain/undo_redo/undo_redo_stack.dart';
@@ -19,13 +18,13 @@ class TextBoxOverlay extends ConsumerStatefulWidget {
   final VoidCallback onCommit;
 
   const TextBoxOverlay({
-    Key? key,
+    super.key,
     required this.pageIndex,
     this.existingShape,
     this.initialRect,
     this.colorValue,
     required this.onCommit,
-  }) : super(key: key);
+  });
 
   @override
   ConsumerState<TextBoxOverlay> createState() => _TextBoxOverlayState();
@@ -195,7 +194,7 @@ class _TextBoxOverlayState extends ConsumerState<TextBoxOverlay> {
           // height: null to let it grow with text, or clamp it
           child: Container(
             decoration: BoxDecoration(
-              color: AppColors.surface.withOpacity(0.9),
+              color: AppColors.surface.withValues(alpha: 0.9),
               border: Border.all(color: AppColors.accent), // Dashed in prompt but simple border works well
             ),
             child: TextField(

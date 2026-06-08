@@ -15,7 +15,6 @@ class ImportedContent {
   @ignore
   ImportedContentType get type => ImportedContentType.values[typeId];
   
-  @ignore
   set type(ImportedContentType value) => typeId = value.index;
 
   // Cache path (relative to docsDir — never store absolute paths, they change between installs)

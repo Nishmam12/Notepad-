@@ -13,8 +13,16 @@ import '../../../import/presentation/import_bottom_sheet.dart';
 class ToolBar extends ConsumerStatefulWidget {
   final int notebookId;
   final int pageIndex;
+  final Color? backgroundColor;
+  final ValueChanged<Color>? onBackgroundColorChanged;
 
-  const ToolBar({super.key, required this.notebookId, required this.pageIndex});
+  const ToolBar({
+    super.key, 
+    required this.notebookId, 
+    required this.pageIndex,
+    this.backgroundColor,
+    this.onBackgroundColorChanged,
+  });
 
   @override
   ConsumerState<ToolBar> createState() => _ToolBarState();
@@ -149,7 +157,13 @@ class _ToolBarState extends ConsumerState<ToolBar> {
                   icon: Icons.grid_view,
                   isActive: toolState.template != TemplateType.blank,
                   activeColor: AppColors.accentPurple,
-                  onTap: () => showTemplatePicker(context, ref),
+                  onTap: () => showTemplatePicker(
+                    context: context, 
+                    ref: ref,
+                    notebookId: widget.notebookId,
+                    currentColor: widget.backgroundColor ?? Colors.white,
+                    onColorChanged: widget.onBackgroundColorChanged,
+                  ),
                   tooltip: 'Change Background Template',
                 ),
                 isTablet ? const SizedBox(height: 12) : const SizedBox(width: 12),

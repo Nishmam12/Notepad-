@@ -1,6 +1,5 @@
 // Renders the canvas (background + template + strokes) to PNG or PDF bytes.
 
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';

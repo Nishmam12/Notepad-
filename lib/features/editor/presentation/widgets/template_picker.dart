@@ -8,22 +8,41 @@ import '../../domain/models/template_type.dart';
 import '../../presentation/canvas_notifier.dart';
 import '../canvas/layers/template_painter.dart';
 
-/// Shows a bottom sheet with a 2×3 grid of template preview cards.
-void showTemplatePicker(BuildContext context, WidgetRef ref) {
+/// Shows a bottom sheet with a 2×3 grid of template preview cards and a color selector.
+void showTemplatePicker({
+  required BuildContext context, 
+  required WidgetRef ref,
+  required int notebookId,
+  required Color currentColor,
+  ValueChanged<Color>? onColorChanged,
+}) {
   showModalBottomSheet(
     context: context,
     backgroundColor: AppColors.surface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
     ),
-    builder: (context) => _TemplatePickerSheet(ref: ref),
+    builder: (context) => _TemplatePickerSheet(
+      ref: ref,
+      notebookId: notebookId,
+      currentColor: currentColor,
+      onColorChanged: onColorChanged,
+    ),
   );
 }
 
 class _TemplatePickerSheet extends StatelessWidget {
   final WidgetRef ref;
+  final int notebookId;
+  final Color currentColor;
+  final ValueChanged<Color>? onColorChanged;
 
-  const _TemplatePickerSheet({required this.ref});
+  const _TemplatePickerSheet({
+    required this.ref,
+    required this.notebookId,
+    required this.currentColor,
+    this.onColorChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -72,6 +91,45 @@ class _TemplatePickerSheet extends StatelessWidget {
                     ref.read(toolProvider.notifier).setTemplate(type);
                     Navigator.of(context).pop();
                   },
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 24),
+
+            const Text(
+              'Paper Color',
+              style: TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                const Color(0xFFFFFFFF), // White
+                const Color(0xFFFAF7F0), // Cream
+                const Color(0xFF1E1E1E), // Dark
+              ].map((color) {
+                final isSelected = currentColor.toARGB32() == color.toARGB32();
+                return GestureDetector(
+                  onTap: () {
+                    onColorChanged?.call(color);
+                    Navigator.of(context).pop();
+                  },
+                  child: Container(
+                    margin: const EdgeInsets.only(right: 16),
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: color,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: isSelected ? AppColors.accent : AppColors.border,
+                        width: isSelected ? 2 : 1,
+                      ),
+                    ),
+                  ),
                 );
               }).toList(),
             ),

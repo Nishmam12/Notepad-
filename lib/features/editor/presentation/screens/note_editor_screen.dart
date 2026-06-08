@@ -19,9 +19,7 @@ import '../widgets/free_image_overlay.dart';
 import '../imported_content_notifier.dart';
 import '../../domain/undo_redo/undo_redo_stack.dart';
 import '../../domain/undo_redo/stroke_add_command.dart';
-import '../../data/storage/ink_file_storage.dart';
 import '../../data/storage/page_cache_manager.dart';
-import '../../data/storage/page_thumbnail_service.dart';
 import '../../data/storage/thumbnail_cache_manager.dart';
 import '../../domain/services/autosave_manager.dart';
 import '../../data/repositories/shape_repository.dart';
@@ -37,6 +35,7 @@ import '../../domain/services/lasso_hit_tester.dart';
 import '../widgets/shape_toolbar.dart';
 import '../widgets/selection_overlay.dart' as app_sel;
 import '../widgets/text_box_overlay.dart';
+import '../../../home/presentation/home_notifier.dart';
 
 final lassoPreviewProvider = StateProvider.autoDispose<List<Offset>>((ref) => []);
 final activeTextBoxProvider = StateProvider.autoDispose<ShapeElement?>((ref) => null);
@@ -57,6 +56,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> with Widget
 
   late final ShapeInputHandler _shapeInputHandler;
   late final LassoInputHandler _lassoInputHandler;
+  Color _backgroundColor = Colors.white;
 
   @override
   void initState() {
@@ -122,7 +122,14 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> with Widget
 
     
     // Initialize the page provider to ensure pages are loaded
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final notebook = await ref.read(noteRepositoryProvider).getNotebook(widget.notebookId);
+      if (mounted && notebook != null) {
+        setState(() {
+          _backgroundColor = Color(notebook.backgroundColor);
+        });
+      }
+
       ref.read(pageProvider(widget.notebookId).notifier).initialize().then((_) {
         // For the very first load, old and new are both 0.
         // We can just pass empty list for oldStrokes since there's nothing to save yet.
@@ -132,6 +139,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> with Widget
     });
   }
 
+  @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _autosaveManager.dispose();
@@ -283,7 +291,8 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> with Widget
               tooltip: 'Book View',
               onPressed: () {
                 _forceSave().then((_) {
-                  if (mounted) context.push('/note/${widget.notebookId}/book');
+                  if (!context.mounted) return;
+                  context.push('/note/${widget.notebookId}/book');
                 });
               },
             ),
@@ -350,20 +359,24 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> with Widget
                         _triggerAutosave();
                       }
                     },
-                    child: CanvasWidget(
-                                completedStrokes: canvasState.completedStrokes,
-                                currentStrokePoints: canvasState.currentStrokePoints,
-                                currentStrokeColor: toolState.color,
-                                currentStrokeSize: toolState.size,
-                                currentStrokeOpacity: toolState.opacity,
-                                importedContentState: importedState,
-                                isEraser: toolState.isEraser && toolState.eraserType == EraserType.pixel,
-                                templateType: toolState.template,
-                                shapes: shapeState.shapes,
-                                selectionState: selectionState,
-                                lassoPreviewPath: lassoPreviewPath,
-                                pageIndex: currentIndex,
-                              ),
+                    child: Container(
+                      color: _backgroundColor,
+                      child: CanvasWidget(
+                                  completedStrokes: canvasState.completedStrokes,
+                                  currentStrokePoints: canvasState.currentStrokePoints,
+                                  currentStrokeColor: toolState.color,
+                                  currentStrokeSize: toolState.size,
+                                  currentStrokeOpacity: toolState.opacity,
+                                  importedContentState: importedState,
+                                  isEraser: toolState.isEraser && toolState.eraserType == EraserType.pixel,
+                                  templateType: toolState.template,
+                                  backgroundColor: _backgroundColor,
+                                  shapes: shapeState.shapes,
+                                  selectionState: selectionState,
+                                  lassoPreviewPath: lassoPreviewPath,
+                                  pageIndex: currentIndex,
+                                ),
+                    ),
                   ),
                   FreeImageOverlay(notebookId: widget.notebookId, pageIndex: currentIndex),
                   app_sel.SelectionOverlay(pageIndex: currentIndex),
@@ -372,14 +385,22 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> with Widget
                       pageIndex: currentIndex,
                       existingShape: activeTextBox,
                       initialRect: textBoxRect,
-                      colorValue: toolState.color.value,
+                      colorValue: toolState.color.toARGB32(),
                       onCommit: () {
                         ref.read(activeTextBoxProvider.notifier).state = null;
                         ref.read(textBoxRectProvider.notifier).state = null;
                       },
                     ),
                   const ShapeToolbar(),
-                  ToolBar(notebookId: widget.notebookId, pageIndex: currentIndex),
+                  ToolBar(
+                    notebookId: widget.notebookId, 
+                    pageIndex: currentIndex,
+                    backgroundColor: _backgroundColor,
+                    onBackgroundColorChanged: (color) {
+                      setState(() => _backgroundColor = color);
+                      ref.read(noteRepositoryProvider).updateBackgroundColor(widget.notebookId, color.toARGB32());
+                    },
+                  ),
                 ],
               ),
             ),

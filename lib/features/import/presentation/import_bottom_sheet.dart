@@ -11,11 +11,7 @@ class ImportBottomSheet extends ConsumerWidget {
   final int notebookId;
   final int pageIndex;
 
-  const ImportBottomSheet({
-    Key? key,
-    required this.notebookId,
-    required this.pageIndex,
-  }) : super(key: key);
+  const ImportBottomSheet({super.key, required this.notebookId, required this.pageIndex});
 
   static Future<void> show(BuildContext context, int notebookId, int pageIndex) {
     return showModalBottomSheet(

@@ -16,15 +16,13 @@ import '../widgets/free_image_overlay.dart';
 import '../imported_content_notifier.dart';
 import '../../domain/undo_redo/undo_redo_stack.dart';
 import '../../domain/undo_redo/stroke_add_command.dart';
-import '../../data/storage/ink_file_storage.dart';
 import '../../data/storage/page_cache_manager.dart';
-import '../../data/storage/page_thumbnail_service.dart';
+import '../../data/storage/thumbnail_cache_manager.dart';
 import '../shape_notifier.dart';
 import '../../domain/models/shape_element.dart';
 import '../../data/repositories/shape_repository.dart';
 import '../../domain/services/autosave_manager.dart';
-import '../../../home/data/repositories/page_repository.dart';
-import '../../data/storage/thumbnail_cache_manager.dart';
+import '../../../home/presentation/home_notifier.dart';
 
 // Family provider to track the active page index (the one last drawn/touched on) in the book view.
 final activeBookPageIndexProvider = StateProvider.family<int, int>((ref, notebookId) => -1);
@@ -43,6 +41,7 @@ class _BookViewScreenState extends ConsumerState<BookViewScreen> with WidgetsBin
   final AutosaveManager _autosaveManager = AutosaveManager();
   Timer? _autosaveTimer;
   bool _isSaving = false;
+  Color _resolvedBackgroundColor = Colors.white;
 
   @override
   void initState() {
@@ -50,7 +49,14 @@ class _BookViewScreenState extends ConsumerState<BookViewScreen> with WidgetsBin
     WidgetsBinding.instance.addObserver(this);
     _autosaveManager.initialize(widget.notebookId);
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final notebook = await ref.read(noteRepositoryProvider).getNotebook(widget.notebookId);
+      if (mounted && notebook != null) {
+        setState(() {
+          _resolvedBackgroundColor = Color(notebook.backgroundColor);
+        });
+      }
+
       ref.read(pageProvider(widget.notebookId).notifier).initialize().then((_) {
         final totalPages = ref.read(pageProvider(widget.notebookId)).pages.length;
         ref.read(bookViewProvider(widget.notebookId).notifier).updateTotalPages(totalPages);
@@ -236,18 +242,20 @@ class _BookViewScreenState extends ConsumerState<BookViewScreen> with WidgetsBin
                             valueColor: AlwaysStoppedAnimation<Color>(AppColors.accent),
                           ),
                         )
-                      : GestureDetector(
-                          onHorizontalDragEnd: (details) {
-                            if (details.primaryVelocity != null) {
-                              if (details.primaryVelocity! > 300) {
-                                ref.read(bookViewProvider(widget.notebookId).notifier).previousSpread();
-                              } else if (details.primaryVelocity! < -300) {
-                                ref.read(bookViewProvider(widget.notebookId).notifier).nextSpread();
-                              }
-                            }
-                          },
-                          child: LayoutBuilder(
-                            builder: (context, constraints) {
+                      : Stack(
+                          children: [
+                            Positioned.fill(
+                              child: AnimatedSwitcher(
+                                duration: const Duration(milliseconds: 300),
+                                transitionBuilder: (Widget child, Animation<double> animation) {
+                                  return FadeTransition(
+                                    opacity: animation,
+                                    child: child,
+                                  );
+                                },
+                                child: LayoutBuilder(
+                                  key: ValueKey(bookViewState.currentSpread),
+                                  builder: (context, constraints) {
                               final workspaceWidth = constraints.maxWidth - 48;
                               final workspaceHeight = constraints.maxHeight - 48;
 
@@ -272,49 +280,96 @@ class _BookViewScreenState extends ConsumerState<BookViewScreen> with WidgetsBin
                                   width: bookWidth,
                                   height: bookHeight,
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFF161B22), // Book Hardcover
-                                    borderRadius: BorderRadius.circular(16),
+                                    gradient: const LinearGradient(
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                      colors: [
+                                        Color(0xFF2C2C2E),   // dark slate top-left
+                                        Color(0xFF1C1C1E),   // deeper slate bottom-right
+                                      ],
+                                    ),
+                                    borderRadius: const BorderRadius.only(
+                                      topLeft: Radius.circular(4),
+                                      bottomLeft: Radius.circular(4),
+                                      topRight: Radius.circular(12),
+                                      bottomRight: Radius.circular(12),
+                                    ),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: Colors.black.withValues(alpha: 0.45),
-                                        blurRadius: 24,
-                                        offset: const Offset(0, 10),
+                                        color: Colors.black.withValues(alpha: 0.6),
+                                        blurRadius: 40,
+                                        spreadRadius: 4,
+                                        offset: const Offset(0, 16),
+                                      ),
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: 0.4),
+                                        blurRadius: 12,
+                                        offset: const Offset(4, 8),
                                       ),
                                     ],
                                   ),
-                                  padding: const EdgeInsets.all(8), // Cover overhang
+                                  padding: const EdgeInsets.fromLTRB(12, 10, 10, 12), // asymmetric
                                   child: ClipRRect(
                                     borderRadius: BorderRadius.circular(8),
                                     child: isDoublePage
                                         ? Row(
                                             children: [
                                               Expanded(
-                                                child: EditablePagePane(
-                                                  pageIndex: leftPage,
-                                                  notebookId: widget.notebookId,
-                                                  totalPages: totalPages,
-                                                  onAutosaveTriggered: _triggerAutosave,
+                                                child: Container(
+                                                  decoration: BoxDecoration(
+                                                    boxShadow: [
+                                                      BoxShadow(
+                                                        color: Colors.black.withValues(alpha: 0.25),
+                                                        blurRadius: 8,
+                                                        offset: const Offset(-2, 0),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  child: EditablePagePane(
+                                                    pageIndex: leftPage,
+                                                    notebookId: widget.notebookId,
+                                                    backgroundColor: _resolvedBackgroundColor,
+                                                    totalPages: totalPages,
+                                                    onAutosaveTriggered: _triggerAutosave,
+                                                  ),
                                                 ),
                                               ),
                                               // spine shadow/gradient
                                               Container(
-                                                width: 20,
-                                                decoration: BoxDecoration(
+                                                width: 32,
+                                                decoration: const BoxDecoration(
                                                   gradient: LinearGradient(
+                                                    begin: Alignment.centerLeft,
+                                                    end: Alignment.centerRight,
                                                     colors: [
-                                                      Colors.black.withValues(alpha: 0.25),
-                                                      Colors.black.withValues(alpha: 0.5),
-                                                      Colors.black.withValues(alpha: 0.25),
+                                                      Color(0xFF000000),         // deep shadow on left page edge
+                                                      Color(0xFF3A3A3C),         // spine surface
+                                                      Color(0xFF555557),         // spine highlight centre
+                                                      Color(0xFF3A3A3C),         // spine surface
+                                                      Color(0xFF000000),         // deep shadow on right page edge
                                                     ],
+                                                    stops: [0.0, 0.15, 0.5, 0.85, 1.0],
                                                   ),
                                                 ),
                                               ),
                                               Expanded(
-                                                child: EditablePagePane(
-                                                  pageIndex: rightPage,
-                                                  notebookId: widget.notebookId,
-                                                  totalPages: totalPages,
-                                                  onAutosaveTriggered: _triggerAutosave,
+                                                child: Container(
+                                                  decoration: BoxDecoration(
+                                                    boxShadow: [
+                                                      BoxShadow(
+                                                        color: Colors.black.withValues(alpha: 0.25),
+                                                        blurRadius: 8,
+                                                        offset: const Offset(2, 0),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  child: EditablePagePane(
+                                                    pageIndex: rightPage,
+                                                    notebookId: widget.notebookId,
+                                                    backgroundColor: _resolvedBackgroundColor,
+                                                    totalPages: totalPages,
+                                                    onAutosaveTriggered: _triggerAutosave,
+                                                  ),
                                                 ),
                                               ),
                                             ],
@@ -323,19 +378,58 @@ class _BookViewScreenState extends ConsumerState<BookViewScreen> with WidgetsBin
                                             child: SizedBox(
                                               width: bookWidth - 16,
                                               height: bookHeight - 16,
-                                              child: EditablePagePane(
-                                                pageIndex: hasRight ? rightPage : leftPage,
-                                                notebookId: widget.notebookId,
-                                                totalPages: totalPages,
-                                                onAutosaveTriggered: _triggerAutosave,
+                                              child: Container(
+                                                decoration: BoxDecoration(
+                                                  boxShadow: [
+                                                    BoxShadow(
+                                                      color: Colors.black.withValues(alpha: 0.25),
+                                                      blurRadius: 8,
+                                                      offset: const Offset(2, 0),
+                                                    ),
+                                                  ],
+                                                ),
+                                                child: EditablePagePane(
+                                                  pageIndex: hasRight ? rightPage : leftPage,
+                                                  notebookId: widget.notebookId,
+                                                  backgroundColor: _resolvedBackgroundColor,
+                                                  totalPages: totalPages,
+                                                  onAutosaveTriggered: _triggerAutosave,
+                                                ),
                                               ),
                                             ),
                                           ),
                                   ),
                                 ),
-                              );
-                            },
+                                  );
+                                },
+                              ),
+                            ),
                           ),
+                            // Left Edge Tap Zone
+                            Positioned(
+                              left: 0,
+                              top: 0,
+                              bottom: 0,
+                              width: MediaQuery.of(context).size.width * 0.1,
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.translucent,
+                                onTap: () => ref.read(bookViewProvider(widget.notebookId).notifier).previousSpread(),
+                                child: const SizedBox.expand(),
+                              ),
+                            ),
+                            // Right Edge Tap Zone
+                            Positioned(
+                              right: 0,
+                              top: 0,
+                              bottom: 0,
+                              width: MediaQuery.of(context).size.width * 0.1,
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.translucent,
+                                onTap: () => ref.read(bookViewProvider(widget.notebookId).notifier).nextSpread(),
+                                child: const SizedBox.expand(),
+                              ),
+                            ),
+                          ],
                         ),
                 ),
               ],
@@ -356,12 +450,14 @@ class EditablePagePane extends ConsumerWidget {
   final int pageIndex;
   final int notebookId;
   final int totalPages;
+  final Color backgroundColor;
   final VoidCallback onAutosaveTriggered;
 
   const EditablePagePane({
     super.key,
     required this.pageIndex,
     required this.notebookId,
+    required this.backgroundColor,
     required this.totalPages,
     required this.onAutosaveTriggered,
   });
@@ -421,7 +517,7 @@ class EditablePagePane extends ConsumerWidget {
             }
           },
           child: Container(
-            color: Colors.white, // solid paper background
+            color: backgroundColor,
             child: CanvasWidget(
               completedStrokes: canvasState.completedStrokes,
               currentStrokePoints: canvasState.currentStrokePoints,
@@ -431,6 +527,7 @@ class EditablePagePane extends ConsumerWidget {
               importedContentState: importedState,
               isEraser: toolState.isEraser,
               templateType: toolState.template,
+              backgroundColor: backgroundColor,
               shapes: shapeState.shapes,
               pageIndex: pageIndex,
             ),

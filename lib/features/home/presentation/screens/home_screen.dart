@@ -12,7 +12,6 @@ import '../../../editor/domain/models/stroke.dart';
 import '../../../editor/domain/models/stroke_point.dart';
 import '../../../editor/data/storage/ink_file_storage.dart';
 import '../../../editor/presentation/page_notifier.dart';
-import '../../data/repositories/page_repository.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});

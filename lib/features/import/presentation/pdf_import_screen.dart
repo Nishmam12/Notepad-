@@ -12,11 +12,7 @@ class PdfImportScreen extends ConsumerStatefulWidget {
   final int notebookId;
   final int initialPageIndex;
 
-  const PdfImportScreen({
-    Key? key,
-    required this.notebookId,
-    required this.initialPageIndex,
-  }) : super(key: key);
+  const PdfImportScreen({super.key, required this.notebookId, required this.initialPageIndex});
 
   @override
   ConsumerState<PdfImportScreen> createState() => _PdfImportScreenState();
@@ -54,7 +50,7 @@ class _PdfImportScreenState extends ConsumerState<PdfImportScreen> {
         _statusMessage = 'Rendering PDF pages...';
       });
 
-      final pdfService = PDFService(ref.read(pdfCacheManagerProvider));
+      final pdfService = PDFService();
       final importedPages = await pdfService.renderAll(filePath, widget.notebookId.toString());
 
       setState(() {

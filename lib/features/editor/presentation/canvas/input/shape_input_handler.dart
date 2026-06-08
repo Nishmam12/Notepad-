@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import '../../../domain/models/shape_element.dart';
 import '../../../domain/models/stroke_point.dart';
@@ -125,10 +124,10 @@ class ShapeInputHandler {
     return ShapeElement()
       ..id = id
       ..type = result.type
-      ..color = toolState.color.value
+      ..color = toolState.color.toARGB32()
       ..strokeWidth = toolState.size
       ..hasFill = false // toolState.hasFill if available
-      ..fillColor = toolState.color.value
+      ..fillColor = toolState.color.toARGB32()
       ..opacity = 1.0
       ..rotation = 0.0
       ..text = ''

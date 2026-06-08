@@ -12,7 +12,7 @@ class SelectionLayer extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     if (lassoPreviewPath != null && lassoPreviewPath!.length > 1) {
       final lassoPaint = Paint()
-        ..color = AppColors.accent.withOpacity(0.6)
+        ..color = AppColors.accent.withValues(alpha: 0.6)
         ..strokeWidth = 1.5
         ..style = PaintingStyle.stroke
         ..strokeCap = StrokeCap.round;
@@ -20,7 +20,7 @@ class SelectionLayer extends CustomPainter {
       canvas.drawPath(path, lassoPaint);
       
       final fillPaint = Paint()
-        ..color = AppColors.accent.withOpacity(0.08)
+        ..color = AppColors.accent.withValues(alpha: 0.08)
         ..style = PaintingStyle.fill;
       canvas.drawPath(Path()..addPolygon(lassoPreviewPath!, true), fillPaint);
     }

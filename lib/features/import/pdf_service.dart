@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
@@ -7,7 +6,6 @@ import 'package:pdfx/pdfx.dart';
 
 import '../../core/constants/storage_paths.dart';
 import '../editor/domain/models/imported_content.dart';
-import '../editor/data/storage/pdf_cache_manager.dart';
 
 class ImportException implements Exception {
   final String message;
@@ -26,9 +24,7 @@ class _PdfRenderPayload {
 }
 
 class PDFService {
-  final PdfCacheManager _cacheManager;
-
-  PDFService(this._cacheManager);
+  PDFService();
 
   /// Renders all pages of a PDF and creates an ImportedContent for each page.
   /// Runs inside a background isolate to prevent UI thread blocking.

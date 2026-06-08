@@ -48,14 +48,14 @@ class ShapeLayer extends CustomPainter {
     canvas.translate(-centre.dx, -centre.dy);
 
     final strokePaint = Paint()
-      ..color = Color(shape.color).withOpacity(shape.opacity)
+      ..color = Color(shape.color).withValues(alpha: shape.opacity)
       ..strokeWidth = shape.strokeWidth
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
 
     final fillPaint = Paint()
-      ..color = Color(shape.fillColor).withOpacity(shape.hasFill ? shape.opacity : 0)
+      ..color = Color(shape.fillColor).withValues(alpha: shape.hasFill ? shape.opacity : 0)
       ..style = PaintingStyle.fill;
 
     switch (shape.type) {
@@ -121,7 +121,7 @@ class ShapeLayer extends CustomPainter {
         fontWeight: shape.isBold ? FontWeight.bold : FontWeight.normal,
         fontStyle: shape.isItalic ? FontStyle.italic : FontStyle.normal,
       ),
-    )..pushStyle(ui.TextStyle(color: Color(shape.color).withOpacity(shape.opacity)))
+    )..pushStyle(ui.TextStyle(color: Color(shape.color).withValues(alpha: shape.opacity)))
      ..addText(shape.text);
     
     final paragraph = builder.build()
@@ -150,7 +150,7 @@ class ShapeLayer extends CustomPainter {
 
   void _drawSvgPlaceholder(Canvas canvas, ShapeElement shape, Paint paint) {
     final rect = ShapeGeometry.rectFromGeometry(shape.geometryData);
-    canvas.drawRect(rect, paint..color = paint.color.withOpacity(0.4));
+    canvas.drawRect(rect, paint..color = paint.color.withValues(alpha: 0.4));
   }
 
   @override

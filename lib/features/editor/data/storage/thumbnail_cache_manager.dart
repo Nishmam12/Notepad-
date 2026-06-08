@@ -1,5 +1,4 @@
 import 'dart:ui' as ui;
-import 'package:flutter/foundation.dart';
 import 'page_thumbnail_service.dart';
 
 class ThumbnailCacheManager {

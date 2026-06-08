@@ -28,13 +28,13 @@ class BookViewNotifier extends StateNotifier<BookViewState> {
   List<int> get pagesForSpread => calculateSpreadPages(state.currentSpread);
 
   List<int> calculateSpreadPages(int spreadIndex) {
-    final left = spreadIndex * 2 - 1;
-    final right = spreadIndex * 2;
+    final left = spreadIndex * 2;
+    final right = spreadIndex * 2 + 1;
     return [left, right];
   }
 
   void nextSpread() {
-    final maxSpread = state.totalPages ~/ 2;
+    final maxSpread = (state.totalPages - 1) ~/ 2;
     if (state.currentSpread < maxSpread) {
       state = BookViewState(
         currentSpread: state.currentSpread + 1,
@@ -56,7 +56,7 @@ class BookViewNotifier extends StateNotifier<BookViewState> {
   void jumpToPage(int pageIndex) {
     if (pageIndex < 0 || pageIndex >= state.totalPages) return;
     
-    final targetSpread = (pageIndex + 1) ~/ 2;
+    final targetSpread = pageIndex ~/ 2;
     if (targetSpread != state.currentSpread) {
       state = BookViewState(
         currentSpread: targetSpread,

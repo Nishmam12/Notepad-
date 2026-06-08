@@ -33,9 +33,7 @@ RecognitionResult? recogniseShape(List<Offset> rawPoints) {
       // The prompt says: compute vectors from second-to-last to last and from second-to-last to third-to-last.
       // If the angle is < 45° (acute V shape), it is an arrow.
       if (simplifiedPoints.length >= 3) {
-        final v1 = last - secondToLast;
-        final v2 = simplifiedPoints[simplifiedPoints.length - 3] - secondToLast;
-        
+
         final angle = ShapeGeometry.angleBetween(last, secondToLast, simplifiedPoints[simplifiedPoints.length - 3]);
         
         // 45 degrees in radians is ~0.785

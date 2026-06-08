@@ -16,4 +16,6 @@ class Notebook {
 
   @Index()
   int pageCount = 1;
+
+  int backgroundColor = 0xFFFFFFFF;
 }

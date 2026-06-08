@@ -6,7 +6,7 @@ import '../../domain/models/shape_type.dart';
 import '../canvas_notifier.dart';
 
 class ShapeToolbar extends ConsumerWidget {
-  const ShapeToolbar({Key? key}) : super(key: key);
+  const ShapeToolbar({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -34,7 +34,7 @@ class ShapeToolbar extends ConsumerWidget {
                 border: Border.all(color: AppColors.border, width: 1),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.2),
+                    color: AppColors.surface.withValues(alpha: 0.95),
                     blurRadius: 8,
                     offset: const Offset(0, 4),
                   ),
@@ -74,7 +74,7 @@ class ShapeToolbar extends ConsumerWidget {
         margin: const EdgeInsets.symmetric(horizontal: 4),
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.accent.withOpacity(0.2) : Colors.transparent,
+          color: isSelected ? AppColors.accent.withValues(alpha: 0.2) : Colors.transparent,
           borderRadius: BorderRadius.circular(6),
           border: Border.all(
             color: isSelected ? AppColors.accent : Colors.transparent,

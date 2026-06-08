@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/constants/app_colors.dart';
 import '../../domain/models/imported_content.dart';
 import '../imported_content_notifier.dart';
 
@@ -8,11 +9,7 @@ class FreeImageOverlay extends ConsumerStatefulWidget {
   final int notebookId;
   final int pageIndex;
 
-  const FreeImageOverlay({
-    Key? key,
-    required this.notebookId,
-    required this.pageIndex,
-  }) : super(key: key);
+  const FreeImageOverlay({super.key, required this.notebookId, required this.pageIndex});
 
   @override
   ConsumerState<FreeImageOverlay> createState() => _FreeImageOverlayState();
@@ -78,7 +75,7 @@ class _FreeImageOverlayState extends ConsumerState<FreeImageOverlay> {
             },
             child: Container(
               decoration: BoxDecoration(
-                border: Border.all(color: Colors.blue.withOpacity(0.5), width: 2),
+                border: Border.all(color: AppColors.surface.withValues(alpha: 0.9), width: 2),
               ),
             ),
           ),

@@ -58,6 +58,23 @@ class NoteRepository {
     });
   }
 
+  /// Updates the background color of an existing notebook.
+  Future<void> updateBackgroundColor(int id, int color) async {
+    final notebook = await _isar.notebooks.get(id);
+    if (notebook != null) {
+      notebook.backgroundColor = color;
+      notebook.modifiedAt = DateTime.now();
+      await _isar.writeTxn(() async {
+        await _isar.notebooks.put(notebook);
+      });
+    }
+  }
+
+  /// Gets a notebook by ID.
+  Future<Notebook?> getNotebook(int id) async {
+    return await _isar.notebooks.get(id);
+  }
+
   /// Returns all pages for a given notebook, ordered by page index.
   Future<List<NotePage>> getPagesForNotebook(int notebookId) async {
     return _isar.notePages
