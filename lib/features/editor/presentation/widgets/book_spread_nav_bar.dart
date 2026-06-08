@@ -3,15 +3,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../book_view_notifier.dart';
+import '../page_notifier.dart';
 
 class BookSpreadNavBar extends ConsumerWidget {
-  final int totalPages;
+  final int notebookId;
   
-  const BookSpreadNavBar({super.key, required this.totalPages});
+  const BookSpreadNavBar({super.key, required this.notebookId});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final bookViewState = ref.watch(bookViewProvider(totalPages));
+    final bookViewState = ref.watch(bookViewProvider(notebookId));
+    final pageState = ref.watch(pageProvider(notebookId));
+    final totalPages = pageState.pages.length;
     final maxSpread = totalPages ~/ 2;
     
     return Container(
@@ -25,7 +28,7 @@ class BookSpreadNavBar extends ConsumerWidget {
             icon: Icon(Icons.arrow_back_ios, 
                 color: bookViewState.currentSpread > 0 ? AppColors.textPrimary : AppColors.textMuted),
             onPressed: bookViewState.currentSpread > 0 
-                ? () => ref.read(bookViewProvider(totalPages).notifier).previousSpread()
+                ? () => ref.read(bookViewProvider(notebookId).notifier).previousSpread()
                 : null,
           ),
           Text(
@@ -36,7 +39,7 @@ class BookSpreadNavBar extends ConsumerWidget {
             icon: Icon(Icons.arrow_forward_ios, 
                 color: bookViewState.currentSpread < maxSpread ? AppColors.textPrimary : AppColors.textMuted),
             onPressed: bookViewState.currentSpread < maxSpread
-                ? () => ref.read(bookViewProvider(totalPages).notifier).nextSpread()
+                ? () => ref.read(bookViewProvider(notebookId).notifier).nextSpread()
                 : null,
           ),
         ],
@@ -44,3 +47,4 @@ class BookSpreadNavBar extends ConsumerWidget {
     );
   }
 }
+

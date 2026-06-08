@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'page_notifier.dart';
+
 class BookViewState {
   final int currentSpread;
   final int totalPages;
@@ -64,6 +66,14 @@ class BookViewNotifier extends StateNotifier<BookViewState> {
   }
 }
 
-final bookViewProvider = StateNotifierProvider.family<BookViewNotifier, BookViewState, int>((ref, totalPages) {
-  return BookViewNotifier(totalPages: totalPages);
+final bookViewProvider = StateNotifierProvider.family<BookViewNotifier, BookViewState, int>((ref, notebookId) {
+  final initialPages = ref.read(pageProvider(notebookId)).pages.length;
+  final notifier = BookViewNotifier(totalPages: initialPages);
+  
+  ref.listen(pageProvider(notebookId), (previous, next) {
+    notifier.updateTotalPages(next.pages.length);
+  });
+  
+  return notifier;
 });
+

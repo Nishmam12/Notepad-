@@ -113,48 +113,13 @@ class HomeScreen extends ConsumerWidget {
   }
 
   Future<void> _createNotebook(BuildContext context, WidgetRef ref) async {
-    final controller = TextEditingController();
+    final title = await showDialog<String>(
+      context: context,
+      builder: (context) => const _CreateNotebookDialog(),
+    );
 
-    try {
-      final title = await showDialog<String>(
-        context: context,
-        builder: (context) => AlertDialog(
-          backgroundColor: AppColors.surface,
-          title: const Text('New Notebook'),
-          content: TextField(
-            controller: controller,
-            autofocus: true,
-            style: const TextStyle(color: AppColors.textPrimary),
-            decoration: const InputDecoration(
-              hintText: 'Notebook title',
-              hintStyle: TextStyle(color: AppColors.textMuted),
-              enabledBorder: UnderlineInputBorder(
-                borderSide: BorderSide(color: AppColors.border),
-              ),
-              focusedBorder: UnderlineInputBorder(
-                borderSide: BorderSide(color: AppColors.accent),
-              ),
-            ),
-            onSubmitted: (value) => Navigator.of(context).pop(value),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(controller.text),
-              child: const Text('Create'),
-            ),
-          ],
-        ),
-      );
-
-      if (title != null && title.trim().isNotEmpty) {
-        await ref.read(homeNotifierProvider.notifier).createNotebook(title.trim());
-      }
-    } finally {
-      controller.dispose();
+    if (title != null && title.trim().isNotEmpty) {
+      await ref.read(homeNotifierProvider.notifier).createNotebook(title.trim());
     }
   }
 
@@ -311,6 +276,63 @@ class _NotebookCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _CreateNotebookDialog extends StatefulWidget {
+  const _CreateNotebookDialog();
+
+  @override
+  State<_CreateNotebookDialog> createState() => _CreateNotebookDialogState();
+}
+
+class _CreateNotebookDialogState extends State<_CreateNotebookDialog> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: AppColors.surface,
+      title: const Text('New Notebook'),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        style: const TextStyle(color: AppColors.textPrimary),
+        decoration: const InputDecoration(
+          hintText: 'Notebook title',
+          hintStyle: TextStyle(color: AppColors.textMuted),
+          enabledBorder: UnderlineInputBorder(
+            borderSide: BorderSide(color: AppColors.border),
+          ),
+          focusedBorder: UnderlineInputBorder(
+            borderSide: BorderSide(color: AppColors.accent),
+          ),
+        ),
+        onSubmitted: (value) => Navigator.of(context).pop(value),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(_controller.text),
+          child: const Text('Create'),
+        ),
+      ],
     );
   }
 }

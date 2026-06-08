@@ -26,6 +26,9 @@ import '../../domain/services/autosave_manager.dart';
 import '../../../home/data/repositories/page_repository.dart';
 import '../../data/storage/thumbnail_cache_manager.dart';
 
+// Family provider to track the active page index (the one last drawn/touched on) in the book view.
+final activeBookPageIndexProvider = StateProvider.family<int, int>((ref, notebookId) => -1);
+
 class BookViewScreen extends ConsumerStatefulWidget {
   final int notebookId;
 
@@ -50,7 +53,7 @@ class _BookViewScreenState extends ConsumerState<BookViewScreen> with WidgetsBin
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(pageProvider(widget.notebookId).notifier).initialize().then((_) {
         final totalPages = ref.read(pageProvider(widget.notebookId)).pages.length;
-        ref.read(bookViewProvider(totalPages).notifier).updateTotalPages(totalPages);
+        ref.read(bookViewProvider(widget.notebookId).notifier).updateTotalPages(totalPages);
         _loadCurrentSpread(0, {}, {});
       });
     });
@@ -71,8 +74,8 @@ class _BookViewScreenState extends ConsumerState<BookViewScreen> with WidgetsBin
       final pageState = ref.read(pageProvider(widget.notebookId));
       final totalPages = pageState.pages.length;
       if (totalPages > 0) {
-        final targetSpread = ref.read(bookViewProvider(totalPages)).currentSpread;
-        final spreadPages = ref.read(bookViewProvider(totalPages).notifier).calculateSpreadPages(targetSpread);
+        final targetSpread = ref.read(bookViewProvider(widget.notebookId)).currentSpread;
+        final spreadPages = ref.read(bookViewProvider(widget.notebookId).notifier).calculateSpreadPages(targetSpread);
         for (final pageIndex in spreadPages) {
           if (pageIndex >= 0 && pageIndex < totalPages) {
             _autosaveManager.forceSaveSync(
@@ -107,8 +110,8 @@ class _BookViewScreenState extends ConsumerState<BookViewScreen> with WidgetsBin
       return;
     }
 
-    final targetSpread = overrideSpread ?? ref.read(bookViewProvider(totalPages)).currentSpread;
-    final spreadPages = ref.read(bookViewProvider(totalPages).notifier).calculateSpreadPages(targetSpread);
+    final targetSpread = overrideSpread ?? ref.read(bookViewProvider(widget.notebookId)).currentSpread;
+    final spreadPages = ref.read(bookViewProvider(widget.notebookId).notifier).calculateSpreadPages(targetSpread);
 
     final size = MediaQuery.of(context).size;
 
@@ -145,7 +148,7 @@ class _BookViewScreenState extends ConsumerState<BookViewScreen> with WidgetsBin
     final totalPages = pageState.pages.length;
     if (totalPages == 0) return;
 
-    final spreadPages = ref.read(bookViewProvider(totalPages).notifier).pagesForSpread;
+    final spreadPages = ref.read(bookViewProvider(widget.notebookId).notifier).pagesForSpread;
 
     for (final pageIndex in spreadPages) {
       if (pageIndex >= 0 && pageIndex < totalPages) {
@@ -166,10 +169,10 @@ class _BookViewScreenState extends ConsumerState<BookViewScreen> with WidgetsBin
     final pageState = ref.watch(pageProvider(widget.notebookId));
     final totalPages = pageState.pages.length;
 
-    ref.listen<BookViewState>(bookViewProvider(totalPages), (previous, next) {
+    ref.listen<BookViewState>(bookViewProvider(widget.notebookId), (previous, next) {
       if (previous != null && previous.currentSpread != next.currentSpread) {
         // Read old strokes synchronously before the autoDispose provider is destroyed
-        final oldSpreadPages = ref.read(bookViewProvider(totalPages).notifier).calculateSpreadPages(previous.currentSpread);
+        final oldSpreadPages = ref.read(bookViewProvider(widget.notebookId).notifier).calculateSpreadPages(previous.currentSpread);
         final oldStrokes = <int, List<Stroke>>{};
         final oldShapes = <int, List<ShapeElement>>{};
         for (final p in oldSpreadPages) {
@@ -182,9 +185,19 @@ class _BookViewScreenState extends ConsumerState<BookViewScreen> with WidgetsBin
       }
     });
 
-    final spreadPages = ref.read(bookViewProvider(totalPages).notifier).pagesForSpread;
+    final bookViewState = ref.watch(bookViewProvider(widget.notebookId));
+    final spreadPages = ref.read(bookViewProvider(widget.notebookId).notifier).calculateSpreadPages(bookViewState.currentSpread);
     final leftPage = spreadPages[0];
     final rightPage = spreadPages[1];
+
+    final hasLeft = leftPage >= 0 && leftPage < totalPages;
+    final hasRight = rightPage >= 0 && rightPage < totalPages;
+
+    final activePageIndex = ref.watch(activeBookPageIndexProvider(widget.notebookId));
+    int resolvedActivePageIndex = activePageIndex;
+    if (!spreadPages.contains(activePageIndex)) {
+      resolvedActivePageIndex = hasLeft ? leftPage : (hasRight ? rightPage : 0);
+    }
 
     return PopScope(
       onPopInvokedWithResult: (didPop, result) {
@@ -196,6 +209,7 @@ class _BookViewScreenState extends ConsumerState<BookViewScreen> with WidgetsBin
         backgroundColor: AppColors.background,
         appBar: AppBar(
           backgroundColor: AppColors.surface,
+          elevation: 0,
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
             onPressed: () {
@@ -207,46 +221,130 @@ class _BookViewScreenState extends ConsumerState<BookViewScreen> with WidgetsBin
           ),
           title: const Text(
             'Book View',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: AppColors.textPrimary),
           ),
         ),
-        body: Column(
+        body: Stack(
           children: [
-            BookSpreadNavBar(totalPages: totalPages),
-            Expanded(
-              child: GestureDetector(
-                onHorizontalDragEnd: (details) {
-                  if (details.primaryVelocity != null) {
-                    if (details.primaryVelocity! > 300) {
-                      ref.read(bookViewProvider(totalPages).notifier).previousSpread();
-                    } else if (details.primaryVelocity! < -300) {
-                      ref.read(bookViewProvider(totalPages).notifier).nextSpread();
-                    }
-                  }
-                },
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: EditablePagePane(
-                        pageIndex: leftPage,
-                        notebookId: widget.notebookId,
-                        totalPages: totalPages,
-                        onAutosaveTriggered: _triggerAutosave,
-                      ),
-                    ),
-                    Container(width: 2, color: AppColors.border),
-                    Expanded(
-                      child: EditablePagePane(
-                        pageIndex: rightPage,
-                        notebookId: widget.notebookId,
-                        totalPages: totalPages,
-                        onAutosaveTriggered: _triggerAutosave,
-                      ),
-                    ),
-                  ],
+            Column(
+              children: [
+                BookSpreadNavBar(notebookId: widget.notebookId),
+                Expanded(
+                  child: totalPages == 0
+                      ? const Center(
+                          child: CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation<Color>(AppColors.accent),
+                          ),
+                        )
+                      : GestureDetector(
+                          onHorizontalDragEnd: (details) {
+                            if (details.primaryVelocity != null) {
+                              if (details.primaryVelocity! > 300) {
+                                ref.read(bookViewProvider(widget.notebookId).notifier).previousSpread();
+                              } else if (details.primaryVelocity! < -300) {
+                                ref.read(bookViewProvider(widget.notebookId).notifier).nextSpread();
+                              }
+                            }
+                          },
+                          child: LayoutBuilder(
+                            builder: (context, constraints) {
+                              final workspaceWidth = constraints.maxWidth - 48;
+                              final workspaceHeight = constraints.maxHeight - 48;
+
+                              if (workspaceWidth <= 0 || workspaceHeight <= 0) {
+                                return const SizedBox.shrink();
+                              }
+
+                              final isDoublePage = hasLeft && hasRight;
+                              final targetAspectRatio = isDoublePage ? 1.414 : 0.707;
+
+                              double bookWidth, bookHeight;
+                              if (workspaceWidth / workspaceHeight > targetAspectRatio) {
+                                bookHeight = workspaceHeight;
+                                bookWidth = workspaceHeight * targetAspectRatio;
+                              } else {
+                                bookWidth = workspaceWidth;
+                                bookHeight = workspaceWidth / targetAspectRatio;
+                              }
+
+                              return Center(
+                                child: Container(
+                                  width: bookWidth,
+                                  height: bookHeight,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF161B22), // Book Hardcover
+                                    borderRadius: BorderRadius.circular(16),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: 0.45),
+                                        blurRadius: 24,
+                                        offset: const Offset(0, 10),
+                                      ),
+                                    ],
+                                  ),
+                                  padding: const EdgeInsets.all(8), // Cover overhang
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: isDoublePage
+                                        ? Row(
+                                            children: [
+                                              Expanded(
+                                                child: EditablePagePane(
+                                                  pageIndex: leftPage,
+                                                  notebookId: widget.notebookId,
+                                                  totalPages: totalPages,
+                                                  onAutosaveTriggered: _triggerAutosave,
+                                                ),
+                                              ),
+                                              // spine shadow/gradient
+                                              Container(
+                                                width: 20,
+                                                decoration: BoxDecoration(
+                                                  gradient: LinearGradient(
+                                                    colors: [
+                                                      Colors.black.withValues(alpha: 0.25),
+                                                      Colors.black.withValues(alpha: 0.5),
+                                                      Colors.black.withValues(alpha: 0.25),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ),
+                                              Expanded(
+                                                child: EditablePagePane(
+                                                  pageIndex: rightPage,
+                                                  notebookId: widget.notebookId,
+                                                  totalPages: totalPages,
+                                                  onAutosaveTriggered: _triggerAutosave,
+                                                ),
+                                              ),
+                                            ],
+                                          )
+                                        : Center(
+                                            child: SizedBox(
+                                              width: bookWidth - 16,
+                                              height: bookHeight - 16,
+                                              child: EditablePagePane(
+                                                pageIndex: hasRight ? rightPage : leftPage,
+                                                notebookId: widget.notebookId,
+                                                totalPages: totalPages,
+                                                onAutosaveTriggered: _triggerAutosave,
+                                              ),
+                                            ),
+                                          ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
                 ),
-              ),
+              ],
             ),
+            if (totalPages > 0)
+              ToolBar(
+                notebookId: widget.notebookId,
+                pageIndex: resolvedActivePageIndex,
+              ),
           ],
         ),
       ),
@@ -283,6 +381,9 @@ class EditablePagePane extends ConsumerWidget {
       children: [
         RawPointerListener(
           onPointerDown: (event, point) {
+            // Set this page as the active page for tool operations
+            ref.read(activeBookPageIndexProvider(notebookId).notifier).state = pageIndex;
+
             if (toolState.isEraser && toolState.eraserType == EraserType.stroke) {
               ref.read(canvasStateProvider(pageIndex).notifier).eraseAtPoint(point, toolState.size * 2);
               onAutosaveTriggered();
@@ -319,21 +420,23 @@ class EditablePagePane extends ConsumerWidget {
               onAutosaveTriggered();
             }
           },
-          child: CanvasWidget(
-            completedStrokes: canvasState.completedStrokes,
-            currentStrokePoints: canvasState.currentStrokePoints,
-            currentStrokeColor: toolState.color,
-            currentStrokeSize: toolState.size,
-            currentStrokeOpacity: toolState.opacity,
-            importedContentState: importedState,
-            isEraser: toolState.isEraser,
-            templateType: toolState.template,
-            shapes: shapeState.shapes,
-            pageIndex: pageIndex,
+          child: Container(
+            color: Colors.white, // solid paper background
+            child: CanvasWidget(
+              completedStrokes: canvasState.completedStrokes,
+              currentStrokePoints: canvasState.currentStrokePoints,
+              currentStrokeColor: toolState.color,
+              currentStrokeSize: toolState.size,
+              currentStrokeOpacity: toolState.opacity,
+              importedContentState: importedState,
+              isEraser: toolState.isEraser,
+              templateType: toolState.template,
+              shapes: shapeState.shapes,
+              pageIndex: pageIndex,
+            ),
           ),
         ),
         FreeImageOverlay(notebookId: notebookId, pageIndex: pageIndex),
-        ToolBar(notebookId: notebookId, pageIndex: pageIndex),
         Positioned(
           top: 16,
           right: 16,
