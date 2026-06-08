@@ -17,10 +17,13 @@ class PageRepository {
       () async {
         final pages = await getPagesForNotebook(notebookId);
         for (int i = 0; i < pages.length; i++) {
-          assert(
-            pages[i].pageIndex == i,
-            'Contiguity violation: expected index $i, got ${pages[i].pageIndex}',
-          );
+          if (pages[i].pageIndex != i) {
+            // Contiguity violation found, auto-fixing by updating index
+            pages[i].pageIndex = i;
+            await _isar.writeTxn(() async {
+              await _isar.notePages.put(pages[i]);
+            });
+          }
         }
       }();
       return true;

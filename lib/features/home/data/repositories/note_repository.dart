@@ -26,7 +26,8 @@ class NoteRepository {
     final firstPage = NotePage()
       ..notebookId = notebook.id
       ..pageIndex = 0
-      ..createdAt = DateTime.now();
+      ..createdAt = DateTime.now()
+      ..modifiedAt = DateTime.now();
 
     await _isar.writeTxn(() async {
       await _isar.notePages.put(firstPage);

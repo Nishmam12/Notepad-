@@ -51,7 +51,8 @@ class _TemplatePickerSheet extends StatelessWidget {
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
-        child: Column(
+        child: SingleChildScrollView(
+          child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -135,6 +136,7 @@ class _TemplatePickerSheet extends StatelessWidget {
             ),
             const SizedBox(height: 8),
           ],
+        ),
         ),
       ),
     );
