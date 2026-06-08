@@ -77,11 +77,19 @@ class ImportedContentNotifier extends StateNotifier<ImportedContentState> {
       }
 
       if (!mounted) return;
+      final oldImages = state.loadedImages;
       state = state.copyWith(
         contents: records,
         loadedImages: images,
         isLoading: false,
       );
+      
+      // Clean up old images that are no longer referenced
+      for (final entry in oldImages.entries) {
+        if (!images.containsKey(entry.key)) {
+          entry.value.dispose();
+        }
+      }
     } catch (e) {
       if (!mounted) return;
       state = state.copyWith(
@@ -89,6 +97,14 @@ class ImportedContentNotifier extends StateNotifier<ImportedContentState> {
         errorMessage: 'Failed to load imported content: $e',
       );
     }
+  }
+
+  @override
+  void dispose() {
+    for (final image in state.loadedImages.values) {
+      image.dispose();
+    }
+    super.dispose();
   }
 
   Future<void> addContent(int notebookId, ImportedContent content) async {
@@ -100,7 +116,8 @@ class ImportedContentNotifier extends StateNotifier<ImportedContentState> {
     await _repository.removeContent(notebookId, pageIndex, contentId);
     
     final updatedImages = Map<String, ui.Image>.from(state.loadedImages);
-    updatedImages.remove(contentId);
+    final removedImage = updatedImages.remove(contentId);
+    removedImage?.dispose();
     
     final updatedContents = state.contents.where((c) => c.id != contentId).toList();
     

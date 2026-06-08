@@ -37,7 +37,7 @@ class PdfCacheManager {
         // Move to back of LRU (most recently used)
         _lruKeys.remove(key);
         _lruKeys.add(key);
-        return _cache[key];
+        return _cache[key]?.clone();
       }
       return null;
     } finally {
@@ -54,7 +54,7 @@ class PdfCacheManager {
         if (oldImage != image) {
           oldImage?.dispose();
         }
-        _cache[key] = image;
+        _cache[key] = image.clone();
         _lruKeys.remove(key);
         _lruKeys.add(key);
       } else {
@@ -65,7 +65,7 @@ class PdfCacheManager {
           oldestImage?.dispose();
         }
         
-        _cache[key] = image;
+        _cache[key] = image.clone();
         _lruKeys.add(key);
       }
     } finally {

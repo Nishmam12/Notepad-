@@ -38,9 +38,10 @@ class ThumbnailCacheManager {
 
   static void invalidate(int notebookId, int pageIndex) {
     final key = '${notebookId}_$pageIndex';
-    final image = _cache.remove(key);
+    _cache.remove(key);
     _lruKeys.remove(key);
-    image?.dispose();
+    // Note: We do not call image?.dispose() here because the filmstrip UI
+    // is likely still rendering this thumbnail while the new one is generating.
   }
 
   static void clear() {
