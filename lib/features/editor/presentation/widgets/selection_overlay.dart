@@ -68,26 +68,26 @@ class _SelectionOverlayState extends ConsumerState<SelectionOverlay> {
           _buildHandle(
             center: bounds.topLeft,
             onPanStart: _handlePanStart,
-            onPanUpdate: _handlePanUpdate,
-            onPanEnd: (_) => _commitMove(selectionState),
+            onPanUpdate: _handleScaleUpdate,
+            onPanEnd: (_) => _commitTransform(selectionState),
           ),
           _buildHandle(
             center: bounds.topRight,
             onPanStart: _handlePanStart,
-            onPanUpdate: _handlePanUpdate,
-            onPanEnd: (_) => _commitMove(selectionState),
+            onPanUpdate: _handleScaleUpdate,
+            onPanEnd: (_) => _commitTransform(selectionState),
           ),
           _buildHandle(
             center: bounds.bottomLeft,
             onPanStart: _handlePanStart,
-            onPanUpdate: _handlePanUpdate,
-            onPanEnd: (_) => _commitMove(selectionState),
+            onPanUpdate: _handleScaleUpdate,
+            onPanEnd: (_) => _commitTransform(selectionState),
           ),
           _buildHandle(
             center: bounds.bottomRight,
             onPanStart: _handlePanStart,
-            onPanUpdate: _handlePanUpdate,
-            onPanEnd: (_) => _commitMove(selectionState),
+            onPanUpdate: _handleScaleUpdate,
+            onPanEnd: (_) => _commitTransform(selectionState),
           ),
 
           // Rotation handle (24x24 visible, 32dp above top-centre)
@@ -166,6 +166,7 @@ class _SelectionOverlayState extends ConsumerState<SelectionOverlay> {
 
   void _handlePanStart(DragStartDetails details) {
     _dragStart = details.globalPosition;
+    _initialBounds = ref.read(selectionProvider).selectionBounds;
     ref.read(selectionProvider.notifier).beginTransform();
   }
 
@@ -177,7 +178,27 @@ class _SelectionOverlayState extends ConsumerState<SelectionOverlay> {
     }
   }
 
+  void _handleScaleUpdate(DragUpdateDetails details) {
+    if (_dragStart != null && _initialBounds != null) {
+      final initialDistance = (_dragStart! - _initialBounds!.center).distance;
+      if (initialDistance == 0) return;
+      
+      final currentDistance = (details.globalPosition - _initialBounds!.center).distance;
+      final targetScale = currentDistance / initialDistance;
+      
+      // Calculate delta scale factor to apply on top of the current scale
+      final currentScale = ref.read(selectionProvider).currentScale;
+      final scaleFactor = targetScale / currentScale;
+      
+      ref.read(selectionProvider.notifier).scaleSelection(scaleFactor);
+    }
+  }
+
   void _commitMove(SelectionState state) {
+    _commitTransform(state);
+  }
+
+  void _commitTransform(SelectionState state) {
     ref.read(selectionProvider.notifier).endTransform();
     _dragStart = null;
     

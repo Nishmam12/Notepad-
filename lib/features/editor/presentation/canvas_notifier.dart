@@ -99,6 +99,11 @@ class CanvasStateNotifier extends StateNotifier<CanvasState> {
     );
   }
 
+  /// Clears the current in-progress stroke (useful when discarding a preview).
+  void clearCurrentStroke() {
+    state = state.copyWith(currentStrokePoints: const []);
+  }
+
   /// Finishes the current stroke and adds it to the completed strokes list.
   void finishStroke(Color color, double size, double opacity, {bool isEraser = false}) {
     if (state.currentStrokePoints.isEmpty) return;
@@ -136,6 +141,22 @@ class CanvasStateNotifier extends StateNotifier<CanvasState> {
   void addStroke(Stroke stroke) {
     state = state.copyWith(
       completedStrokes: [...state.completedStrokes, stroke],
+    );
+  }
+
+  /// Updates an existing stroke by ID.
+  void updateStroke(Stroke updatedStroke) {
+    state = state.copyWith(
+      completedStrokes: state.completedStrokes
+          .map((s) => s.id == updatedStroke.id ? updatedStroke : s)
+          .toList(),
+    );
+  }
+
+  /// Removes a stroke by ID.
+  void removeStroke(String id) {
+    state = state.copyWith(
+      completedStrokes: state.completedStrokes.where((s) => s.id != id).toList(),
     );
   }
 

@@ -28,6 +28,7 @@ class CanvasWidget extends StatelessWidget {
   final List<ShapeElement> shapes;
   final SelectionState selectionState;
   final List<Offset>? lassoPreviewPath;
+  final int pageIndex;
 
   const CanvasWidget({
     super.key,
@@ -43,6 +44,7 @@ class CanvasWidget extends StatelessWidget {
     this.shapes = const [],
     this.selectionState = const SelectionState(),
     this.lassoPreviewPath,
+    required this.pageIndex,
   });
 
   @override
@@ -75,7 +77,11 @@ class CanvasWidget extends StatelessWidget {
         // Layer 2: Stroke History — completed strokes, cached as GPU texture.
         RepaintBoundary(
           child: CustomPaint(
-            painter: StrokeHistoryLayer(strokes: completedStrokes),
+            painter: StrokeHistoryLayer(
+              strokes: completedStrokes,
+              selectionState: selectionState,
+              pageIndex: pageIndex,
+            ),
             size: Size.infinite,
           ),
         ),
@@ -100,6 +106,7 @@ class CanvasWidget extends StatelessWidget {
           child: CustomPaint(
             painter: ShapeLayer(
               shapes: shapes,
+              selectionState: selectionState,
             ),
             size: Size.infinite,
           ),

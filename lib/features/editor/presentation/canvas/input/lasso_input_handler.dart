@@ -1,23 +1,25 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
-import '../../../../domain/models/stroke.dart';
-import '../../../../domain/models/shape_element.dart';
-import '../../../../domain/services/lasso_hit_tester.dart';
-import '../../../../domain/services/shape_geometry.dart';
+import 'dart:ui';
+import '../../../domain/models/stroke.dart';
+import '../../../domain/models/shape_element.dart';
+import '../../../domain/models/shape_type.dart';
+import '../../../domain/services/shape_geometry.dart';
+import '../../../domain/services/lasso_hit_tester.dart';
 
 class LassoInputHandler {
   final void Function(LassoHitResult result, Rect bounds) onLassoComplete;
   final void Function(List<Offset> previewPath) onLassoUpdate;
-  final List<Stroke> currentStrokes;
-  final List<ShapeElement> currentShapes;
+  final List<Stroke> Function() getCurrentStrokes;
+  final List<ShapeElement> Function() getCurrentShapes;
 
   final List<Offset> _lassoPath = [];
 
   LassoInputHandler({
     required this.onLassoComplete,
     required this.onLassoUpdate,
-    required this.currentStrokes,
-    required this.currentShapes,
+    required this.getCurrentStrokes,
+    required this.getCurrentShapes,
   });
 
   void onPointerDown(PointerDownEvent event) {
@@ -37,6 +39,9 @@ class LassoInputHandler {
       onLassoUpdate([]);
       return;
     }
+
+    final currentStrokes = getCurrentStrokes();
+    final currentShapes = getCurrentShapes();
 
     final input = LassoHitTestInput(
       lassoPath: List.from(_lassoPath),

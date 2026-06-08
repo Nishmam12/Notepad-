@@ -1,5 +1,7 @@
 // A single point in a stroke with x, y coordinates and stylus pressure.
 
+import 'dart:ui';
+
 class StrokePoint {
   final double x;
   final double y;
@@ -28,4 +30,18 @@ class StrokePoint {
       'p': pressure,
     };
   }
+
+  StrokePoint copyWith({
+    double? x,
+    double? y,
+    double? pressure,
+  }) {
+    return StrokePoint(
+      x: x ?? this.x,
+      y: y ?? this.y,
+      pressure: pressure ?? this.pressure,
+    );
+  }
+
+  Offset toOffset() => Offset(x, y);
 }

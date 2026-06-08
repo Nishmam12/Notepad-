@@ -7,6 +7,8 @@ import '../features/home/presentation/screens/home_screen.dart';
 import '../features/editor/presentation/screens/note_editor_screen.dart';
 import '../features/editor/presentation/screens/book_view_screen.dart';
 import '../features/import/presentation/pdf_import_screen.dart';
+import '../features/settings/presentation/screens/settings_screen.dart';
+import '../features/settings/presentation/screens/about_screen.dart';
 
 final GoRouter appRouter = GoRouter(
   initialLocation: '/',
@@ -40,6 +42,14 @@ final GoRouter appRouter = GoRouter(
           },
         ),
       ],
+    ),
+    GoRoute(
+      path: '/settings',
+      builder: (context, state) => const SettingsScreen(),
+    ),
+    GoRoute(
+      path: '/about',
+      builder: (context, state) => const AboutScreen(),
     ),
   ],
 );

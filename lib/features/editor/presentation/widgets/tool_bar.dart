@@ -26,13 +26,19 @@ class _ToolBarState extends ConsumerState<ToolBar> {
     final toolState = ref.watch(toolProvider);
     final undoRedoState = ref.watch(undoRedoProvider(widget.pageIndex));
 
+    final isTablet = MediaQuery.of(context).size.width > 600;
+
     return Positioned(
-      bottom: 24,
+      bottom: isTablet ? null : 24,
       left: 16,
-      right: 16,
+      right: isTablet ? null : 16,
+      top: isTablet ? 100 : null,
       child: Center(
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          padding: EdgeInsets.symmetric(
+            horizontal: isTablet ? 8 : 12, 
+            vertical: isTablet ? 12 : 8
+          ),
           decoration: BoxDecoration(
             color: AppColors.surface,
             borderRadius: BorderRadius.circular(16),
@@ -46,9 +52,10 @@ class _ToolBarState extends ConsumerState<ToolBar> {
             ],
           ),
           child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
+            scrollDirection: isTablet ? Axis.vertical : Axis.horizontal,
             physics: const BouncingScrollPhysics(),
-            child: Row(
+            child: Flex(
+              direction: isTablet ? Axis.vertical : Axis.horizontal,
               mainAxisSize: MainAxisSize.min,
               children: [
                 // Pen tool
@@ -99,90 +106,43 @@ class _ToolBarState extends ConsumerState<ToolBar> {
                   onTap: () => ref.read(toolProvider.notifier).setLassoTool(),
                   tooltip: 'Lasso Selection',
                 ),
-                const SizedBox(width: 8),
+                isTablet ? const SizedBox(height: 12) : const SizedBox(width: 12),
 
                 // Divider
-                Container(
-                  width: 1,
-                  height: 28,
-                  color: AppColors.border,
-                ),
-                const SizedBox(width: 8),
+                isTablet 
+                    ? const Divider(height: 24, color: AppColors.border)
+                    : const VerticalDivider(width: 24, color: AppColors.border),
+                isTablet ? const SizedBox(height: 12) : const SizedBox(width: 12),
 
                 // Undo
                 _ToolButton(
                   icon: Icons.undo,
-                  isActive: false, // Will be wired to history state
-                  activeColor: AppColors.textSecondary,
+                  isActive: false,
+                  activeColor: AppColors.accent,
                   onTap: undoRedoState.canUndo
                       ? () => ref.read(undoRedoProvider(widget.pageIndex).notifier).undo()
                       : null,
                   tooltip: 'Undo',
                 ),
-                const SizedBox(width: 4),
+                isTablet ? const SizedBox(height: 4) : const SizedBox(width: 4),
 
                 // Redo
                 _ToolButton(
                   icon: Icons.redo,
                   isActive: false,
-                  activeColor: AppColors.textSecondary,
+                  activeColor: AppColors.accent,
                   onTap: undoRedoState.canRedo
                       ? () => ref.read(undoRedoProvider(widget.pageIndex).notifier).redo()
                       : null,
                   tooltip: 'Redo',
                 ),
-                const SizedBox(width: 8),
+                isTablet ? const SizedBox(height: 12) : const SizedBox(width: 12),
 
                 // Divider
-                Container(
-                  width: 1,
-                  height: 28,
-                  color: AppColors.border,
-                ),
-                const SizedBox(width: 8),
-
-                // Color picker
-                _ColorDot(
-                  color: toolState.color,
-                  onTap: () => _showColorPicker(context, ref),
-                ),
-                const SizedBox(width: 8),
-
-                // Size slider
-                SizedBox(
-                  width: 80,
-                  child: SliderTheme(
-                    data: const SliderThemeData(
-                      activeTrackColor: AppColors.accent,
-                      inactiveTrackColor: AppColors.border,
-                      thumbColor: AppColors.accent,
-                      trackHeight: 3,
-                      thumbShape: RoundSliderThumbShape(
-                        enabledThumbRadius: 6,
-                      ),
-                      overlayShape: RoundSliderOverlayShape(
-                        overlayRadius: 14,
-                      ),
-                    ),
-                    child: Slider(
-                      value: toolState.size,
-                      min: 1.0,
-                      max: 20.0,
-                      onChanged: (value) {
-                        ref.read(toolProvider.notifier).setSize(value);
-                      },
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-
-                // Divider
-                Container(
-                  width: 1,
-                  height: 28,
-                  color: AppColors.border,
-                ),
-                const SizedBox(width: 8),
+                isTablet 
+                    ? const Divider(height: 24, color: AppColors.border)
+                    : const VerticalDivider(width: 24, color: AppColors.border),
+                isTablet ? const SizedBox(height: 12) : const SizedBox(width: 12),
 
                 // Template picker
                 _ToolButton(
@@ -190,17 +150,60 @@ class _ToolBarState extends ConsumerState<ToolBar> {
                   isActive: toolState.template != TemplateType.blank,
                   activeColor: AppColors.accentPurple,
                   onTap: () => showTemplatePicker(context, ref),
-                  tooltip: 'Template',
+                  tooltip: 'Change Background Template',
                 ),
-                const SizedBox(width: 8),
+                isTablet ? const SizedBox(height: 12) : const SizedBox(width: 12),
 
                 // Divider
-                Container(
-                  width: 1,
-                  height: 28,
-                  color: AppColors.border,
+                isTablet 
+                    ? const Divider(height: 24, color: AppColors.border)
+                    : const VerticalDivider(width: 24, color: AppColors.border),
+                isTablet ? const SizedBox(height: 12) : const SizedBox(width: 12),
+
+                // Color picker
+                _ColorDot(
+                  color: toolState.color,
+                  onTap: () => _showColorPicker(context, ref),
                 ),
-                const SizedBox(width: 8),
+                isTablet ? const SizedBox(height: 12) : const SizedBox(width: 12),
+
+                // Divider
+                isTablet 
+                    ? const Divider(height: 24, color: AppColors.border)
+                    : const VerticalDivider(width: 24, color: AppColors.border),
+                isTablet ? const SizedBox(height: 12) : const SizedBox(width: 12),
+
+                // Size slider
+                SizedBox(
+                  width: isTablet ? 40 : 80,
+                  height: isTablet ? 80 : 40,
+                  child: RotatedBox(
+                    quarterTurns: isTablet ? 3 : 0,
+                    child: SliderTheme(
+                      data: const SliderThemeData(
+                        activeTrackColor: AppColors.accent,
+                        inactiveTrackColor: AppColors.border,
+                        thumbColor: AppColors.accent,
+                        trackHeight: 3,
+                        thumbShape: RoundSliderThumbShape(enabledThumbRadius: 6),
+                        overlayShape: RoundSliderOverlayShape(overlayRadius: 14),
+                      ),
+                      child: Slider(
+                        value: toolState.size,
+                        min: 1.0,
+                        max: 20.0,
+                        onChanged: (value) => ref.read(toolProvider.notifier).setSize(value),
+                      ),
+                    ),
+                  ),
+                ),
+                isTablet ? const SizedBox(height: 12) : const SizedBox(width: 12),
+
+                // Divider
+                isTablet 
+                    ? const Divider(height: 24, color: AppColors.border)
+                    : const VerticalDivider(width: 24, color: AppColors.border),
+                isTablet ? const SizedBox(height: 12) : const SizedBox(width: 12),
 
                 // Import
                 _ToolButton(

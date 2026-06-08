@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:ui' as ui;
 
 class PdfCacheManager {
-  static const int _maxCapacity = 50;
+  static const int _maxCapacity = 6;
 
   final Map<String, ui.Image> _cache = {};
   final List<String> _lruKeys = [];

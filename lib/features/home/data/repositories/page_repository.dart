@@ -174,4 +174,19 @@ class PageRepository {
       }
     });
   }
+
+  void updateModifiedAtSync(int notebookId, int pageIndex) {
+    _isar.writeTxnSync(() {
+      final page = _isar.notePages
+          .filter()
+          .notebookIdEqualTo(notebookId)
+          .and()
+          .pageIndexEqualTo(pageIndex)
+          .findFirstSync();
+      if (page != null) {
+        page.modifiedAt = DateTime.now();
+        _isar.notePages.putSync(page);
+      }
+    });
+  }
 }

@@ -7,12 +7,16 @@ class SelectionState {
   final Set<String> selectedShapeIds;
   final Rect? selectionBounds;
   final bool isTransforming;
+  final Offset currentTranslation;
+  final double currentScale;
 
   const SelectionState({
     this.selectedStrokeIds = const {},
     this.selectedShapeIds = const {},
     this.selectionBounds,
     this.isTransforming = false,
+    this.currentTranslation = Offset.zero,
+    this.currentScale = 1.0,
   });
 
   bool get hasSelection => selectedStrokeIds.isNotEmpty || selectedShapeIds.isNotEmpty;
@@ -22,12 +26,16 @@ class SelectionState {
     Set<String>? selectedShapeIds,
     Rect? selectionBounds,
     bool? isTransforming,
+    Offset? currentTranslation,
+    double? currentScale,
   }) {
     return SelectionState(
       selectedStrokeIds: selectedStrokeIds ?? this.selectedStrokeIds,
       selectedShapeIds: selectedShapeIds ?? this.selectedShapeIds,
       selectionBounds: selectionBounds ?? this.selectionBounds,
       isTransforming: isTransforming ?? this.isTransforming,
+      currentTranslation: currentTranslation ?? this.currentTranslation,
+      currentScale: currentScale ?? this.currentScale,
     );
   }
 }
@@ -51,12 +59,23 @@ class SelectionNotifier extends StateNotifier<SelectionState> {
     if (state.selectionBounds != null) {
       state = state.copyWith(
         selectionBounds: state.selectionBounds!.shift(delta),
+        currentTranslation: state.currentTranslation + delta,
       );
     }
   }
 
   void scaleSelection(double scaleFactor) {
-    // Only visual update to bounds if needed during transform
+    if (state.selectionBounds != null) {
+      // In a real robust implementation, we would scale the bounds relative to its center or the opposite corner.
+      // For now, we'll just track the scale factor for the canvas transform and approximate the bounds.
+      final center = state.selectionBounds!.center;
+      final newWidth = state.selectionBounds!.width * scaleFactor;
+      final newHeight = state.selectionBounds!.height * scaleFactor;
+      state = state.copyWith(
+        currentScale: state.currentScale * scaleFactor,
+        selectionBounds: Rect.fromCenter(center: center, width: newWidth, height: newHeight),
+      );
+    }
   }
 
   void rotateSelection(double deltaRadians) {
@@ -72,7 +91,11 @@ class SelectionNotifier extends StateNotifier<SelectionState> {
   }
 
   void endTransform() {
-    state = state.copyWith(isTransforming: false);
+    state = state.copyWith(
+      isTransforming: false,
+      currentTranslation: Offset.zero,
+      currentScale: 1.0,
+    );
   }
 }
 

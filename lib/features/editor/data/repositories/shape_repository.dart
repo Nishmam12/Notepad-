@@ -6,7 +6,7 @@ import '../../domain/models/shape_element.dart';
 class ShapeRepository {
   final Isar _isar;
 
-  ShapeRepository([Isar? isar]) : _isar = isar ?? IsarService.instance.isar;
+  ShapeRepository([Isar? isar]) : _isar = isar ?? IsarService.instance;
 
   Future<List<ShapeElement>> getShapesForPage(int notebookId, int pageIndex) async {
     return _isar.txn(() async {
@@ -33,6 +33,22 @@ class ShapeRepository {
       if (page != null) {
         page.shapes = shapes;
         await _isar.notePages.put(page);
+      }
+    });
+  }
+
+  void saveShapesForPageSync(int notebookId, int pageIndex, List<ShapeElement> shapes) {
+    _isar.writeTxnSync(() {
+      final page = _isar.notePages
+          .filter()
+          .notebookIdEqualTo(notebookId)
+          .and()
+          .pageIndexEqualTo(pageIndex)
+          .findFirstSync();
+
+      if (page != null) {
+        page.shapes = shapes;
+        _isar.notePages.putSync(page);
       }
     });
   }

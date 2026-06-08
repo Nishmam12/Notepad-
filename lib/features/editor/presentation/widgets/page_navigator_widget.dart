@@ -4,13 +4,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/constants/app_colors.dart';
-import '../../data/storage/page_thumbnail_service.dart';
+import '../../data/storage/thumbnail_cache_manager.dart';
 import '../page_notifier.dart';
 
 class PageNavigatorWidget extends ConsumerStatefulWidget {
   final int notebookId;
+  final Axis direction;
 
-  const PageNavigatorWidget({super.key, required this.notebookId});
+  const PageNavigatorWidget({
+    super.key, 
+    required this.notebookId,
+    this.direction = Axis.horizontal,
+  });
 
   @override
   ConsumerState<PageNavigatorWidget> createState() => _PageNavigatorWidgetState();
@@ -82,15 +87,19 @@ class _PageNavigatorWidgetState extends ConsumerState<PageNavigatorWidget> {
       }
     });
 
+    final isVertical = widget.direction == Axis.vertical;
+
     return Container(
-      height: 120,
+      height: isVertical ? double.infinity : 120,
+      width: isVertical ? 120 : double.infinity,
       color: AppColors.surface,
-      child: Row(
+      child: Flex(
+        direction: widget.direction,
         children: [
           Expanded(
             child: ListView.builder(
               controller: _scrollController,
-              scrollDirection: Axis.horizontal,
+              scrollDirection: widget.direction,
               itemCount: pageState.pages.length,
               itemBuilder: (context, index) {
                 final isActive = index == pageState.currentPageIndex;
@@ -98,8 +107,11 @@ class _PageNavigatorWidgetState extends ConsumerState<PageNavigatorWidget> {
                   onTap: () => ref.read(pageProvider(widget.notebookId).notifier).switchPage(index),
                   onLongPress: () => _showPageOptions(context, index),
                   child: Container(
-                    width: 80,
-                    margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 16),
+                    margin: isVertical 
+                        ? const EdgeInsets.fromLTRB(16, 16, 16, 0)
+                        : const EdgeInsets.fromLTRB(16, 16, 0, 16),
+                    width: isVertical ? double.infinity : 72,
+                    height: isVertical ? 100 : null,
                     decoration: BoxDecoration(
                       color: AppColors.background,
                       border: Border.all(
@@ -112,7 +124,7 @@ class _PageNavigatorWidgetState extends ConsumerState<PageNavigatorWidget> {
                       children: [
                         Positioned.fill(
                           child: FutureBuilder<ui.Image?>(
-                            future: PageThumbnailService.getThumbnailLazy(widget.notebookId, index),
+                            future: ThumbnailCacheManager.getThumbnail(widget.notebookId, index),
                             builder: (context, snapshot) {
                               if (snapshot.data == null) {
                                 return const Center(
@@ -152,16 +164,21 @@ class _PageNavigatorWidgetState extends ConsumerState<PageNavigatorWidget> {
               },
             ),
           ),
-          Container(
-            width: 1,
-            color: AppColors.border,
-            margin: const EdgeInsets.symmetric(vertical: 16),
+          if (!isVertical) const SizedBox(width: 16),
+          if (isVertical) const SizedBox(height: 16),
+          Padding(
+            padding: EdgeInsets.only(
+              right: isVertical ? 0 : 16,
+              bottom: isVertical ? 16 : 0,
+            ),
+            child: FloatingActionButton(
+              heroTag: null,
+              backgroundColor: AppColors.surfaceHighlight,
+              elevation: 0,
+              onPressed: () => ref.read(pageProvider(widget.notebookId).notifier).insertPage(),
+              child: const Icon(Icons.add, color: AppColors.textPrimary),
+            ),
           ),
-          IconButton(
-            icon: const Icon(Icons.add, color: AppColors.accent, size: 32),
-            onPressed: () => ref.read(pageProvider(widget.notebookId).notifier).insertPage(),
-          ),
-          const SizedBox(width: 8),
         ],
       ),
     );

@@ -68,12 +68,16 @@ class PageCacheManager {
       }
     }
     for (final key in keysToRemove) {
-      cache.remove(key);
+      final data = cache.remove(key);
+      data?.backgroundThumbnail?.dispose();
     }
   }
 
   /// Clear the entire cache
   void clear() {
+    for (final data in cache.values) {
+      data.backgroundThumbnail?.dispose();
+    }
     cache.clear();
   }
 }

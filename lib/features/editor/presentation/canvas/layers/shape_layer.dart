@@ -3,18 +3,39 @@ import 'package:flutter/material.dart';
 import '../../../domain/models/shape_element.dart';
 import '../../../domain/models/shape_type.dart';
 import '../../../domain/services/shape_geometry.dart';
+import '../../selection_notifier.dart';
 
 class ShapeLayer extends CustomPainter {
   final List<ShapeElement> shapes;
+  final SelectionState selectionState;
 
-  const ShapeLayer({required this.shapes});
+  const ShapeLayer({
+    required this.shapes,
+    required this.selectionState,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
     // Draw in zOrder ascending
     final sorted = [...shapes]..sort((a, b) => a.zOrder.compareTo(b.zOrder));
     for (final shape in sorted) {
+      final isSelectedTransforming = selectionState.isTransforming && selectionState.selectedShapeIds.contains(shape.id);
+      if (isSelectedTransforming) {
+        canvas.save();
+        canvas.translate(selectionState.currentTranslation.dx, selectionState.currentTranslation.dy);
+        if (selectionState.currentScale != 1.0 && selectionState.selectionBounds != null) {
+           final center = selectionState.selectionBounds!.center;
+           canvas.translate(center.dx, center.dy);
+           canvas.scale(selectionState.currentScale);
+           canvas.translate(-center.dx, -center.dy);
+        }
+      }
+
       _drawShape(canvas, shape);
+
+      if (isSelectedTransforming) {
+        canvas.restore();
+      }
     }
   }
 
@@ -133,5 +154,6 @@ class ShapeLayer extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(ShapeLayer oldDelegate) => shapes != oldDelegate.shapes;
+  bool shouldRepaint(ShapeLayer oldDelegate) => 
+      shapes != oldDelegate.shapes || selectionState != oldDelegate.selectionState;
 }

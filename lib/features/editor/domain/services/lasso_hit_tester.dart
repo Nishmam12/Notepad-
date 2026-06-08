@@ -32,6 +32,21 @@ LassoHitResult runLassoHitTest(LassoHitTestInput input) {
   );
 }
 
+bool _isPointInPolygon(Offset point, List<Offset> polygon) {
+  bool isInside = false;
+  int j = polygon.length - 1;
+  for (int i = 0; i < polygon.length; i++) {
+    final pi = polygon[i];
+    final pj = polygon[j];
+    if (((pi.dy > point.dy) != (pj.dy > point.dy)) &&
+        (point.dx < (pj.dx - pi.dx) * (point.dy - pi.dy) / (pj.dy - pi.dy) + pi.dx)) {
+      isInside = !isInside;
+    }
+    j = i;
+  }
+  return isInside;
+}
+
 LassoHitResult testLasso({
   required List<Offset> lassoPath,
   required List<Stroke> strokes,
@@ -39,14 +54,13 @@ LassoHitResult testLasso({
 }) {
   if (lassoPath.length < 3) return const LassoHitResult({}, {});
 
-  final path = Path()..addPolygon(lassoPath, true);
   final Set<String> selectedStrokeIds = {};
   final Set<String> selectedShapeIds = {};
 
   // For each Stroke: a stroke is selected if ANY of its points is inside the path.
   for (final stroke in strokes) {
     for (final point in stroke.points) {
-      if (path.contains(point.toOffset())) {
+      if (_isPointInPolygon(point.toOffset(), lassoPath)) {
         selectedStrokeIds.add(stroke.id);
         break;
       }
@@ -79,7 +93,7 @@ LassoHitResult testLasso({
 
     // Apply rotation if needed to check the actual centroid, although centroid is invariant 
     // to rotation around itself. We just need its absolute position which is the centroid.
-    if (path.contains(centroid)) {
+    if (_isPointInPolygon(centroid, lassoPath)) {
       selectedShapeIds.add(shape.id);
     }
   }

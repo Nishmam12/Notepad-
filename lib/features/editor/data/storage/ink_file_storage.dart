@@ -22,45 +22,89 @@ class InkFileStorage {
     return '$dir/page_$pageId.ink';
   }
 
-  /// Saves a list of strokes to an .ink file for a given notebook and page.
   static Future<void> saveStrokes({
     required int notebookId,
     required int pageId,
     required List<Stroke> strokes,
   }) async {
     final filePath = await _pageFilePath(notebookId, pageId);
-    final file = File(filePath);
+    final tmpFile = File('$filePath.tmp');
+    final finalFile = File(filePath);
+    final bakFile = File('$filePath.bak');
 
     final data = strokes.map((s) => s.toMap()).toList();
     final jsonString = jsonEncode(data);
-    await file.writeAsString(jsonString);
+
+    // 1. Create a backup of the current file if it exists
+    if (await finalFile.exists()) {
+      await finalFile.copy(bakFile.path);
+    }
+
+    // 2. Write to the temporary file
+    await tmpFile.writeAsString(jsonString);
+
+    // 3. Atomically replace the final file
+    await tmpFile.rename(finalFile.path);
+
+    // 4. Remove backup on success
+    if (await bakFile.exists()) {
+      await bakFile.delete();
+    }
   }
 
-  /// Loads strokes from an .ink file for a given notebook and page.
-  /// Returns an empty list if the file does not exist.
+  static void saveStrokesSync({
+    required String notebookDir,
+    required int pageId,
+    required List<Stroke> strokes,
+  }) {
+    final filePath = '$notebookDir/page_$pageId.ink';
+    final tmpFile = File('$filePath.tmp');
+    final finalFile = File(filePath);
+    final bakFile = File('$filePath.bak');
+
+    final data = strokes.map((s) => s.toMap()).toList();
+    final jsonString = jsonEncode(data);
+
+    if (finalFile.existsSync()) {
+      finalFile.copySync(bakFile.path);
+    }
+
+    tmpFile.writeAsStringSync(jsonString);
+    tmpFile.renameSync(finalFile.path);
+
+    if (bakFile.existsSync()) {
+      bakFile.deleteSync();
+    }
+  }
+
   static Future<List<Stroke>> loadStrokes({
     required int notebookId,
     required int pageId,
   }) async {
     final filePath = await _pageFilePath(notebookId, pageId);
-    final file = File(filePath);
+    final finalFile = File(filePath);
+    final bakFile = File('$filePath.bak');
+    final tmpFile = File('$filePath.tmp');
 
-    if (!await file.exists()) {
-      return [];
+    // Attempt to load from the main file, then backup, then temp.
+    for (final file in [finalFile, bakFile, tmpFile]) {
+      if (!await file.exists()) continue;
+
+      try {
+        final jsonString = await file.readAsString();
+        if (jsonString.trim().isEmpty) continue;
+
+        final data = jsonDecode(jsonString) as List<dynamic>;
+        return data
+            .map((item) => Stroke.fromMap(item as Map<String, dynamic>))
+            .toList();
+      } catch (e) {
+        // Corrupted file, try the next one
+        continue;
+      }
     }
 
-    final jsonString = await file.readAsString();
-    if (jsonString.trim().isEmpty) return [];
-
-    try {
-      final data = jsonDecode(jsonString) as List<dynamic>;
-      return data
-          .map((item) => Stroke.fromMap(item as Map<String, dynamic>))
-          .toList();
-    } catch (e) {
-      // If the file is corrupted, return an empty canvas rather than crashing
-      return [];
-    }
+    return [];
   }
 
   /// Deletes all ink files for a given notebook.

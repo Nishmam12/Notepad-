@@ -106,22 +106,30 @@ class ExportMenu extends StatelessWidget {
     );
 
     try {
-      final pngBytes = await CanvasExportService.exportToPng(
-        strokes: strokes,
-        templateType: templateType,
-        backgroundColor: backgroundColor,
-      );
-
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
 
       switch (action) {
         case _ExportAction.png:
+          final pngBytes = await CanvasExportService.exportToPng(
+            strokes: strokes,
+            templateType: templateType,
+            backgroundColor: backgroundColor,
+          );
           await ExportShareService.sharePng(pngBytes, notebookTitle);
         case _ExportAction.pdf:
-          // For now, share the PNG. Full PDF generation will use the printing package.
-          await ExportShareService.sharePng(pngBytes, notebookTitle);
+          final pdfBytes = await CanvasExportService.exportToPdf(
+            strokes: strokes,
+            templateType: templateType,
+            backgroundColor: backgroundColor,
+          );
+          await ExportShareService.sharePdf(pdfBytes, notebookTitle);
         case _ExportAction.share:
+          final pngBytes = await CanvasExportService.exportToPng(
+            strokes: strokes,
+            templateType: templateType,
+            backgroundColor: backgroundColor,
+          );
           await ExportShareService.sharePng(pngBytes, notebookTitle);
       }
 

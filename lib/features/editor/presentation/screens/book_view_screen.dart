@@ -22,6 +22,9 @@ import '../../data/storage/page_thumbnail_service.dart';
 import '../shape_notifier.dart';
 import '../../domain/models/shape_element.dart';
 import '../../data/repositories/shape_repository.dart';
+import '../../domain/services/autosave_manager.dart';
+import '../../../home/data/repositories/page_repository.dart';
+import '../../data/storage/thumbnail_cache_manager.dart';
 
 class BookViewScreen extends ConsumerStatefulWidget {
   final int notebookId;
@@ -34,6 +37,7 @@ class BookViewScreen extends ConsumerStatefulWidget {
 
 class _BookViewScreenState extends ConsumerState<BookViewScreen> with WidgetsBindingObserver {
   final PageCacheManager _cacheManager = PageCacheManager();
+  final AutosaveManager _autosaveManager = AutosaveManager();
   Timer? _autosaveTimer;
   bool _isSaving = false;
 
@@ -41,6 +45,7 @@ class _BookViewScreenState extends ConsumerState<BookViewScreen> with WidgetsBin
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _autosaveManager.initialize(widget.notebookId);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(pageProvider(widget.notebookId).notifier).initialize().then((_) {
@@ -62,8 +67,25 @@ class _BookViewScreenState extends ConsumerState<BookViewScreen> with WidgetsBin
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
-      _forceSave();
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.detached || state == AppLifecycleState.inactive) {
+      final pageState = ref.read(pageProvider(widget.notebookId));
+      final totalPages = pageState.pages.length;
+      if (totalPages > 0) {
+        final targetSpread = ref.read(bookViewProvider(totalPages)).currentSpread;
+        final spreadPages = ref.read(bookViewProvider(totalPages).notifier).calculateSpreadPages(targetSpread);
+        for (final pageIndex in spreadPages) {
+          if (pageIndex >= 0 && pageIndex < totalPages) {
+            _autosaveManager.forceSaveSync(
+              notebookId: widget.notebookId,
+              pageIndex: pageIndex,
+              strokes: ref.read(canvasStateProvider(pageIndex)).completedStrokes,
+              shapes: ref.read(shapeProvider(pageIndex)).shapes,
+              shapeRepo: ShapeRepository(),
+              pageRepo: ref.read(pageRepositoryProvider),
+            );
+          }
+        }
+      }
     }
   }
 
@@ -96,21 +118,19 @@ class _BookViewScreenState extends ConsumerState<BookViewScreen> with WidgetsBin
         final shapes = overrideShapes?[pageIndex] ?? ref.read(shapeProvider(pageIndex)).shapes;
         final importedState = ref.read(importedContentProvider(pageIndex));
         
-        await InkFileStorage.saveStrokes(
+        await _autosaveManager.forceSaveAsync(
           notebookId: widget.notebookId,
-          pageId: pageIndex,
+          pageIndex: pageIndex,
           strokes: strokes,
-        );
-        await ShapeRepository().saveShapesForPage(widget.notebookId, pageIndex, shapes);
-        
-        PageThumbnailService.generateAndSave(
-          widget.notebookId, 
-          pageIndex, 
-          strokes, 
-          importedState.contents,
-          importedState.loadedImages,
-          shapes,
-          size,
+          shapes: shapes,
+          contents: importedState.contents,
+          loadedImages: importedState.loadedImages,
+          screenSize: size,
+          shapeRepo: ShapeRepository(),
+          pageRepo: ref.read(pageRepositoryProvider),
+          onSaveComplete: () {
+            ThumbnailCacheManager.invalidate(widget.notebookId, pageIndex);
+          },
         );
       }
     }
@@ -309,6 +329,7 @@ class EditablePagePane extends ConsumerWidget {
             isEraser: toolState.isEraser,
             templateType: toolState.template,
             shapes: shapeState.shapes,
+            pageIndex: pageIndex,
           ),
         ),
         FreeImageOverlay(notebookId: notebookId, pageIndex: pageIndex),

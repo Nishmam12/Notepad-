@@ -7,6 +7,12 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../home_notifier.dart';
 import '../../domain/models/notebook.dart';
+import 'dart:math';
+import '../../../editor/domain/models/stroke.dart';
+import '../../../editor/domain/models/stroke_point.dart';
+import '../../../editor/data/storage/ink_file_storage.dart';
+import '../../../editor/presentation/page_notifier.dart';
+import '../../data/repositories/page_repository.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -26,6 +32,18 @@ class HomeScreen extends ConsumerWidget {
           ),
         ),
         centerTitle: false,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.bug_report),
+            tooltip: 'Generate Large Document (Test)',
+            onPressed: () => _generateMockData(context, ref),
+          ),
+          IconButton(
+            icon: const Icon(Icons.settings_outlined),
+            tooltip: 'Settings',
+            onPressed: () => context.push('/settings'),
+          ),
+        ],
       ),
       body: notebooks.isEmpty
           ? _buildEmptyState(context)
@@ -97,42 +115,102 @@ class HomeScreen extends ConsumerWidget {
   Future<void> _createNotebook(BuildContext context, WidgetRef ref) async {
     final controller = TextEditingController();
 
-    final title = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        title: const Text('New Notebook'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          style: const TextStyle(color: AppColors.textPrimary),
-          decoration: const InputDecoration(
-            hintText: 'Notebook title',
-            hintStyle: TextStyle(color: AppColors.textMuted),
-            enabledBorder: UnderlineInputBorder(
-              borderSide: BorderSide(color: AppColors.border),
+    try {
+      final title = await showDialog<String>(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: AppColors.surface,
+          title: const Text('New Notebook'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            style: const TextStyle(color: AppColors.textPrimary),
+            decoration: const InputDecoration(
+              hintText: 'Notebook title',
+              hintStyle: TextStyle(color: AppColors.textMuted),
+              enabledBorder: UnderlineInputBorder(
+                borderSide: BorderSide(color: AppColors.border),
+              ),
+              focusedBorder: UnderlineInputBorder(
+                borderSide: BorderSide(color: AppColors.accent),
+              ),
             ),
-            focusedBorder: UnderlineInputBorder(
-              borderSide: BorderSide(color: AppColors.accent),
-            ),
+            onSubmitted: (value) => Navigator.of(context).pop(value),
           ),
-          onSubmitted: (value) => Navigator.of(context).pop(value),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(controller.text),
+              child: const Text('Create'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(controller.text),
-            child: const Text('Create'),
-          ),
-        ],
+      );
+
+      if (title != null && title.trim().isNotEmpty) {
+        await ref.read(homeNotifierProvider.notifier).createNotebook(title.trim());
+      }
+    } finally {
+      controller.dispose();
+    }
+  }
+
+  Future<void> _generateMockData(BuildContext context, WidgetRef ref) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (c) => const AlertDialog(
+        content: Row(
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(width: 16),
+            Text("Generating 100 pages..."),
+          ],
+        ),
       ),
     );
 
-    if (title != null && title.trim().isNotEmpty) {
-      await ref.read(homeNotifierProvider.notifier).createNotebook(title.trim());
+    try {
+      final title = 'Perf Test ${DateTime.now().millisecondsSinceEpoch}';
+      final notebook = await ref.read(homeNotifierProvider.notifier).createNotebook(title);
+
+      final random = Random();
+      for (int i = 0; i < 100; i++) {
+        final strokes = <Stroke>[];
+        for (int s = 0; s < 50; s++) { // 50 strokes per page
+          final points = <StrokePoint>[];
+          for (int p = 0; p < 20; p++) {
+            points.add(StrokePoint(
+              x: random.nextDouble() * 500,
+              y: random.nextDouble() * 800,
+              pressure: random.nextDouble(),
+            ));
+          }
+          strokes.add(Stroke(
+            id: 'mock_${i}_$s',
+            color: 0xFF000000,
+            size: 5.0,
+            opacity: 1.0,
+            isEraser: false,
+            points: points,
+          ));
+        }
+        
+        await InkFileStorage.saveStrokes(
+          notebookId: notebook.id,
+          pageId: i,
+          strokes: strokes,
+        );
+        
+        if (i > 0) { // first page is created with notebook automatically
+          await ref.read(pageRepositoryProvider).createPage(notebook.id);
+        }
+      }
+    } finally {
+      if (context.mounted) Navigator.of(context).pop();
     }
   }
 
