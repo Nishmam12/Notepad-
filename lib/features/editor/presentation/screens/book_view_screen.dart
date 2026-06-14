@@ -60,7 +60,7 @@ class _BookViewScreenState extends ConsumerState<BookViewScreen> with WidgetsBin
       ref.read(pageProvider(widget.notebookId).notifier).initialize().then((_) {
         final totalPages = ref.read(pageProvider(widget.notebookId)).pages.length;
         ref.read(bookViewProvider(widget.notebookId).notifier).updateTotalPages(totalPages);
-        _loadCurrentSpread(0, {}, {});
+        _loadCurrentSpread(0, {}, {}, saveOldSpread: false);
       });
     });
   }
@@ -147,8 +147,13 @@ class _BookViewScreenState extends ConsumerState<BookViewScreen> with WidgetsBin
     _isSaving = false;
   }
 
-  Future<void> _loadCurrentSpread(int oldSpread, Map<int, List<Stroke>> oldStrokes, Map<int, List<ShapeElement>> oldShapes) async {
-    await _forceSave(overrideSpread: oldSpread, overrideStrokes: oldStrokes, overrideShapes: oldShapes);
+  Future<void> _loadCurrentSpread(int oldSpread, Map<int, List<Stroke>> oldStrokes, Map<int, List<ShapeElement>> oldShapes, {bool saveOldSpread = true}) async {
+    // Skip the save on the initial mount: the spread's pages have not been loaded
+    // into the providers yet, so saving would overwrite their stored data with
+    // empty strokes/shapes and erase the user's drawings.
+    if (saveOldSpread) {
+      await _forceSave(overrideSpread: oldSpread, overrideStrokes: oldStrokes, overrideShapes: oldShapes);
+    }
 
     final pageState = ref.read(pageProvider(widget.notebookId));
     final totalPages = pageState.pages.length;

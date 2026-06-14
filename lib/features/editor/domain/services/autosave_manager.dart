@@ -13,7 +13,10 @@ import 'dart:ui' as ui;
 
 class AutosaveManager {
   Timer? _debounceTimer;
-  bool _isSaving = false;
+  // Serializes saves: each forceSaveAsync runs after the previous one finishes
+  // so a forced save (e.g. on a page switch) is never silently dropped while
+  // another save is still in flight — dropping it would lose that page's data.
+  Future<void> _saveChain = Future<void>.value();
   String? _notebookDir;
 
   Future<void> initialize(int notebookId) async {
@@ -65,14 +68,13 @@ class AutosaveManager {
     required ShapeRepository shapeRepo,
     required PageRepository pageRepo,
     required VoidCallback onSaveComplete,
-  }) async {
+  }) {
     // A forced save supersedes any pending debounced save; cancel it so it can't
     // fire again later against torn-down providers with stale data.
     _debounceTimer?.cancel();
-    if (_isSaving) return;
-    _isSaving = true;
 
-    try {
+    // Queue this save behind any in-flight save instead of dropping it.
+    final next = _saveChain.then((_) async {
       // 1. Save Strokes
       await InkFileStorage.saveStrokes(
         notebookId: notebookId,
@@ -96,11 +98,14 @@ class AutosaveManager {
 
       // 4. Update Modified Time
       await pageRepo.updateModifiedAt(notebookId, pageIndex);
-      
+
       onSaveComplete();
-    } finally {
-      _isSaving = false;
-    }
+    });
+
+    // Keep the chain alive even if this save fails, but surface the error to the
+    // caller awaiting this particular save.
+    _saveChain = next.catchError((_) {});
+    return next;
   }
 
   void forceSaveSync({

@@ -131,9 +131,9 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> with Widget
       }
 
       ref.read(pageProvider(widget.notebookId).notifier).initialize().then((_) {
-        // For the very first load, old and new are both 0.
-        // We can just pass empty list for oldStrokes since there's nothing to save yet.
-        _performPageSwitchLoad(0, 0, [], []);
+        // Initial load: load page 0 without saving first. Nothing has been loaded
+        // into the providers yet, so saving here would wipe the page on disk.
+        _performPageSwitchLoad(0, 0, [], [], saveOldPage: false);
         ref.read(importedContentProvider(0).notifier).loadForPage(widget.notebookId);
       });
     });
@@ -215,10 +215,16 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> with Widget
   }
 
   /// Implements the strict 7-step sequence for switching pages
-  Future<void> _performPageSwitchLoad(int oldPageIndex, int newPageIndex, List<Stroke> oldStrokes, List<ShapeElement> oldShapes) async {
-    // 1. Autosave current
-    await _forceSave(pageIndexOverride: oldPageIndex, strokesOverride: oldStrokes, shapesOverride: oldShapes);
-    
+  Future<void> _performPageSwitchLoad(int oldPageIndex, int newPageIndex, List<Stroke> oldStrokes, List<ShapeElement> oldShapes, {bool saveOldPage = true}) async {
+    // 1. Autosave the page we're leaving.
+    //    Skipped on the initial mount (saveOldPage == false): at that point the
+    //    page's strokes/shapes have NOT been loaded into the providers yet, so a
+    //    save here would overwrite the page's stored data on disk with an empty
+    //    list — silently erasing the drawings the user expects to see.
+    if (saveOldPage) {
+      await _forceSave(pageIndexOverride: oldPageIndex, strokesOverride: oldStrokes, shapesOverride: oldShapes);
+    }
+
     // 2. Clear canvas to prevent ghosting
     ref.read(canvasStateProvider(newPageIndex).notifier).loadStrokes([]);
     ref.read(shapeProvider(newPageIndex).notifier).clearShapes();
