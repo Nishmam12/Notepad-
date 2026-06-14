@@ -283,7 +283,12 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> with Widget
           ),
           title: const Text(
             'Editor',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+            style: TextStyle(
+              fontFamily: 'Poppins',
+              fontSize: 17,
+              fontWeight: FontWeight.w600,
+              letterSpacing: -0.2,
+            ),
           ),
           actions: [
             IconButton(
@@ -312,9 +317,9 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> with Widget
                   RawPointerListener(
                     onPointerDown: (event, point) {
                       if (toolState.activeTool == ToolType.shape) {
-                        _shapeInputHandler.onPointerDown(event as PointerDownEvent);
+                        _shapeInputHandler.onPointerDown(event);
                       } else if (toolState.activeTool == ToolType.lasso) {
-                        _lassoInputHandler.onPointerDown(event as PointerDownEvent);
+                        _lassoInputHandler.onPointerDown(event);
                       } else if (toolState.isEraser && toolState.eraserType == EraserType.stroke) {
                         ref.read(canvasStateProvider(currentIndex).notifier).eraseAtPoint(point, toolState.size * 2);
                         _triggerAutosave();
@@ -324,9 +329,9 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> with Widget
                     },
                     onPointerMove: (event, point) {
                       if (toolState.activeTool == ToolType.shape) {
-                        _shapeInputHandler.onPointerMove(event as PointerMoveEvent);
+                        _shapeInputHandler.onPointerMove(event);
                       } else if (toolState.activeTool == ToolType.lasso) {
-                        _lassoInputHandler.onPointerMove(event as PointerMoveEvent);
+                        _lassoInputHandler.onPointerMove(event);
                       } else if (toolState.isEraser && toolState.eraserType == EraserType.stroke) {
                         ref.read(canvasStateProvider(currentIndex).notifier).eraseAtPoint(point, toolState.size * 2);
                         _triggerAutosave();
@@ -336,9 +341,9 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> with Widget
                     },
                     onPointerUp: (event, point) {
                       if (toolState.activeTool == ToolType.shape) {
-                        _shapeInputHandler.onPointerUp(event as PointerUpEvent);
+                        _shapeInputHandler.onPointerUp(event);
                       } else if (toolState.activeTool == ToolType.lasso) {
-                        _lassoInputHandler.onPointerUp(event as PointerUpEvent);
+                        _lassoInputHandler.onPointerUp(event);
                       } else if (!toolState.isEraser || toolState.eraserType == EraserType.pixel) {
                         ref.read(canvasStateProvider(currentIndex).notifier).finishStroke(
                               toolState.color,

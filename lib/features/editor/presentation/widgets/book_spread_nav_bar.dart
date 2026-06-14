@@ -43,7 +43,9 @@ class _BookSpreadNavBarState extends ConsumerState<BookSpreadNavBar> {
     final bookViewState = ref.watch(bookViewProvider(widget.notebookId));
     final pageState = ref.watch(pageProvider(widget.notebookId));
     final totalPages = pageState.pages.length;
-    final totalSpreads = (totalPages / 2).ceil();
+    // Book layout: cover sits alone on spread 0, so there are (totalPages ~/ 2)
+    // + 1 spreads (spread indices 0 .. totalPages ~/ 2).
+    final totalSpreads = totalPages == 0 ? 0 : (totalPages ~/ 2) + 1;
 
     // Auto-scroll when spread changes
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -80,14 +82,18 @@ class _BookSpreadNavBarState extends ConsumerState<BookSpreadNavBar> {
               itemCount: totalSpreads,
               padding: const EdgeInsets.symmetric(vertical: 8),
               itemBuilder: (context, spreadIndex) {
-                final leftPageIndex = spreadIndex * 2;
-                final rightPageIndex = spreadIndex * 2 + 1;
+                final leftPageIndex = spreadIndex * 2 - 1;
+                final rightPageIndex = spreadIndex * 2;
                 final isActive = spreadIndex == bookViewState.currentSpread;
+                // Jump to a page that actually belongs to this spread (the right
+                // page, falling back to the last valid page on a partial spread).
+                final tapTarget =
+                    rightPageIndex < totalPages ? rightPageIndex : totalPages - 1;
 
                 return GestureDetector(
                   onTap: () => ref
                       .read(bookViewProvider(widget.notebookId).notifier)
-                      .jumpToPage(leftPageIndex),
+                      .jumpToPage(tapTarget),
                   child: Container(
                     width: 80,
                     margin: const EdgeInsets.only(right: 8),
@@ -96,16 +102,11 @@ class _BookSpreadNavBarState extends ConsumerState<BookSpreadNavBar> {
                         color: isActive ? AppColors.accent : AppColors.border,
                         width: isActive ? 2 : 1,
                       ),
-                      borderRadius: BorderRadius.circular(4),
-                      boxShadow: isActive
-                          ? [BoxShadow(
-                              color: AppColors.accent.withValues(alpha: 0.3),
-                              blurRadius: 6,
-                            )]
-                          : null,
+                      borderRadius: BorderRadius.circular(8),
+                      boxShadow: isActive ? AppColors.shadowCard : null,
                     ),
                     child: ClipRRect(
-                      borderRadius: BorderRadius.circular(3),
+                      borderRadius: BorderRadius.circular(7),
                       child: Row(
                         children: [
                           // Left page thumbnail
@@ -171,9 +172,9 @@ class _SpreadThumbnailHalf extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (pageIndex >= totalPages) {
-      // Empty page slot — show blank
-      return Container(color: const Color(0xFFF0EDE8));
+    if (pageIndex < 0 || pageIndex >= totalPages) {
+      // Empty page slot (e.g. the blank left of the cover) — show blank.
+      return Container(color: AppColors.surfaceHighlight);
     }
     return FutureBuilder<ui.Image?>(
       future: ThumbnailCacheManager.getThumbnail(notebookId, pageIndex),
@@ -186,7 +187,7 @@ class _SpreadThumbnailHalf extends StatelessWidget {
         }
         // Thumbnail not yet generated — show warm placeholder
         return Container(
-          color: const Color(0xFFFAF7F0),
+          color: AppColors.paperCream,
           child: const Center(
             child: Icon(Icons.article_outlined, size: 14, color: AppColors.textMuted),
           ),

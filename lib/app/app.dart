@@ -17,7 +17,7 @@ class InkFlowApp extends ConsumerWidget {
       title: 'InkFlow',
       debugShowCheckedModeBanner: false,
       showPerformanceOverlay: settings.devMode,
-      theme: settings.darkMode ? AppTheme.darkTheme : AppTheme.darkTheme, // We'll always use dark theme for now as requested by previous constraints, or expand later.
+      theme: AppTheme.warmTheme,
       routerConfig: appRouter,
     );
   }

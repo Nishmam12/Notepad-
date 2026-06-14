@@ -44,8 +44,36 @@ class PDFService {
   }
 }
 
+/// Deterministic 60-bit FNV-1a hash of a byte sequence, rendered as zero-padded
+/// hex. Unlike `String.hashCode`, this is stable across runs/platforms and is
+/// content-based, so the on-disk page cache is reused correctly across launches
+/// and two different PDFs cannot collide onto the same cache directory.
+String _fnv1aHashHex(List<int> bytes) {
+  const int prime = 0x100000001b3;
+  int hash = 0xcbf29ce484222325;
+  for (final b in bytes) {
+    hash = (hash ^ b) * prime;
+  }
+  // Mask to 60 bits to guarantee a positive value and a clean hex string.
+  return (hash & 0x0FFFFFFFFFFFFFFF).toRadixString(16).padLeft(15, '0');
+}
+
+/// Test-only accessor for the deterministic content hash used as the PDF cache key.
+@visibleForTesting
+String pdfContentHashHex(List<int> bytes) => _fnv1aHashHex(bytes);
+
 Future<List<ImportedContent>> _renderPdfIsolate(_PdfRenderPayload payload) async {
   BackgroundIsolateBinaryMessenger.ensureInitialized(payload.token);
+
+  // Hash the PDF *contents* (off the main thread) for a stable, collision-safe
+  // cache key. Falls back to the path hash if the file can't be read for hashing.
+  String pdfHash;
+  try {
+    final fileBytes = await File(payload.filePath).readAsBytes();
+    pdfHash = _fnv1aHashHex(fileBytes);
+  } catch (_) {
+    pdfHash = _fnv1aHashHex(payload.filePath.codeUnits);
+  }
 
   PdfDocument? document;
   try {
@@ -55,7 +83,6 @@ Future<List<ImportedContent>> _renderPdfIsolate(_PdfRenderPayload payload) async
   }
 
   final List<ImportedContent> importedPages = [];
-  final pdfHash = payload.filePath.hashCode.toRadixString(16).padLeft(8, '0');
 
   try {
     final pageCount = document.pagesCount;

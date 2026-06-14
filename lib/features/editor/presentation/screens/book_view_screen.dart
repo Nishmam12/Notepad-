@@ -227,7 +227,13 @@ class _BookViewScreenState extends ConsumerState<BookViewScreen> with WidgetsBin
           ),
           title: const Text(
             'Book View',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: AppColors.textPrimary),
+            style: TextStyle(
+              fontFamily: 'Poppins',
+              fontSize: 17,
+              fontWeight: FontWeight.w600,
+              letterSpacing: -0.2,
+              color: AppColors.textPrimary,
+            ),
           ),
         ),
         body: Stack(
@@ -284,8 +290,8 @@ class _BookViewScreenState extends ConsumerState<BookViewScreen> with WidgetsBin
                                       begin: Alignment.topLeft,
                                       end: Alignment.bottomRight,
                                       colors: [
-                                        Color(0xFF2C2C2E),   // dark slate top-left
-                                        Color(0xFF1C1C1E),   // deeper slate bottom-right
+                                        Color(0xFF4A3628),   // warm espresso top-left
+                                        Color(0xFF2E2018),   // deeper cocoa bottom-right
                                       ],
                                     ),
                                     borderRadius: const BorderRadius.only(
@@ -296,13 +302,13 @@ class _BookViewScreenState extends ConsumerState<BookViewScreen> with WidgetsBin
                                     ),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: Colors.black.withValues(alpha: 0.6),
+                                        color: AppColors.shadowTint.withValues(alpha: 0.45),
                                         blurRadius: 40,
                                         spreadRadius: 4,
                                         offset: const Offset(0, 16),
                                       ),
                                       BoxShadow(
-                                        color: Colors.black.withValues(alpha: 0.4),
+                                        color: AppColors.shadowTint.withValues(alpha: 0.28),
                                         blurRadius: 12,
                                         offset: const Offset(4, 8),
                                       ),
@@ -342,11 +348,11 @@ class _BookViewScreenState extends ConsumerState<BookViewScreen> with WidgetsBin
                                                     begin: Alignment.centerLeft,
                                                     end: Alignment.centerRight,
                                                     colors: [
-                                                      Color(0xFF000000),         // deep shadow on left page edge
-                                                      Color(0xFF3A3A3C),         // spine surface
-                                                      Color(0xFF555557),         // spine highlight centre
-                                                      Color(0xFF3A3A3C),         // spine surface
-                                                      Color(0xFF000000),         // deep shadow on right page edge
+                                                      Color(0xFF211208),         // deep shadow on left page edge
+                                                      Color(0xFF4A3628),         // warm spine surface
+                                                      Color(0xFF6E5544),         // spine highlight centre
+                                                      Color(0xFF4A3628),         // warm spine surface
+                                                      Color(0xFF211208),         // deep shadow on right page edge
                                                     ],
                                                     stops: [0.0, 0.15, 0.5, 0.85, 1.0],
                                                   ),
@@ -538,15 +544,19 @@ class EditablePagePane extends ConsumerWidget {
           top: 16,
           right: 16,
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: AppColors.surface.withValues(alpha: 0.8),
-              borderRadius: BorderRadius.circular(4),
-              border: Border.all(color: AppColors.border),
+              color: AppColors.textPrimary.withValues(alpha: 0.78),
+              borderRadius: BorderRadius.circular(999),
             ),
             child: Text(
               'Page ${pageIndex + 1}',
-              style: const TextStyle(color: AppColors.textPrimary, fontSize: 12),
+              style: const TextStyle(
+                fontFamily: 'Poppins',
+                color: AppColors.surface,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ),

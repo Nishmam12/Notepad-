@@ -46,12 +46,20 @@ class CanvasExportService {
 
     // 4. Encode to PNG
     final picture = recorder.endRecording();
-    final image = await picture.toImage(
-      _exportWidth.toInt(),
-      _exportHeight.toInt(),
-    );
-    final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-    image.dispose();
+    ui.Image? image;
+    ByteData? byteData;
+    try {
+      image = await picture.toImage(
+        _exportWidth.toInt(),
+        _exportHeight.toInt(),
+      );
+      byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+    } finally {
+      // Dispose both the image and the picture (the latter was previously leaked
+      // on every export).
+      image?.dispose();
+      picture.dispose();
+    }
 
     if (byteData == null) {
       throw Exception('Failed to encode canvas to PNG');

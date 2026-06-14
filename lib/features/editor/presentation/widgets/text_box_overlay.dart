@@ -153,31 +153,39 @@ class _TextBoxOverlayState extends ConsumerState<TextBoxOverlay> {
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
               color: AppColors.surface,
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(999),
               border: Border.all(color: AppColors.border),
+              boxShadow: AppColors.shadowFloat,
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 IconButton(
-                  icon: Icon(Icons.format_bold, color: _isBold ? AppColors.accent : AppColors.textPrimary),
+                  icon: Icon(Icons.format_bold, color: _isBold ? AppColors.accent : AppColors.textSecondary),
                   onPressed: () => setState(() => _isBold = !_isBold),
                   iconSize: 20,
                 ),
                 IconButton(
-                  icon: Icon(Icons.format_italic, color: _isItalic ? AppColors.accent : AppColors.textPrimary),
+                  icon: Icon(Icons.format_italic, color: _isItalic ? AppColors.accent : AppColors.textSecondary),
                   onPressed: () => setState(() => _isItalic = !_isItalic),
                   iconSize: 20,
                 ),
                 // Simple font size slider or buttons
                 IconButton(
-                  icon: const Icon(Icons.text_decrease, color: AppColors.textPrimary),
+                  icon: const Icon(Icons.text_decrease, color: AppColors.textSecondary),
                   onPressed: () => setState(() => _fontSize = (_fontSize - 2).clamp(8.0, 72.0)),
                   iconSize: 20,
                 ),
-                Text('${_fontSize.toInt()}', style: const TextStyle(color: AppColors.textPrimary)),
+                Text(
+                  '${_fontSize.toInt()}',
+                  style: const TextStyle(
+                    fontFamily: 'Poppins',
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
                 IconButton(
-                  icon: const Icon(Icons.text_increase, color: AppColors.textPrimary),
+                  icon: const Icon(Icons.text_increase, color: AppColors.textSecondary),
                   onPressed: () => setState(() => _fontSize = (_fontSize + 2).clamp(8.0, 72.0)),
                   iconSize: 20,
                 ),
@@ -195,6 +203,7 @@ class _TextBoxOverlayState extends ConsumerState<TextBoxOverlay> {
           child: Container(
             decoration: BoxDecoration(
               color: AppColors.surface.withValues(alpha: 0.9),
+              borderRadius: BorderRadius.circular(10),
               border: Border.all(color: AppColors.accent), // Dashed in prompt but simple border works well
             ),
             child: TextField(

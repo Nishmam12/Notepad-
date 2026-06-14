@@ -35,20 +35,32 @@ class InkFileStorage {
     final data = strokes.map((s) => s.toMap()).toList();
     final jsonString = jsonEncode(data);
 
-    // 1. Create a backup of the current file if it exists
-    if (await finalFile.exists()) {
-      await finalFile.copy(bakFile.path);
-    }
+    try {
+      // 1. Create a backup of the current file if it exists
+      if (await finalFile.exists()) {
+        await finalFile.copy(bakFile.path);
+      }
 
-    // 2. Write to the temporary file
-    await tmpFile.writeAsString(jsonString);
+      // 2. Write to the temporary file
+      await tmpFile.writeAsString(jsonString);
 
-    // 3. Atomically replace the final file
-    await tmpFile.rename(finalFile.path);
+      // 3. Atomically replace the final file
+      await tmpFile.rename(finalFile.path);
 
-    // 4. Remove backup on success
-    if (await bakFile.exists()) {
-      await bakFile.delete();
+      // 4. Remove backup only after a confirmed successful rename
+      if (await bakFile.exists()) {
+        await bakFile.delete();
+      }
+    } catch (e) {
+      // On failure, remove a partial temp file so it cannot be mistaken for a
+      // valid page by the load fallback. The original .ink / .bak are left
+      // intact for recovery. Rethrow so the caller is aware the save failed.
+      if (await tmpFile.exists()) {
+        try {
+          await tmpFile.delete();
+        } catch (_) {}
+      }
+      rethrow;
     }
   }
 
@@ -65,15 +77,26 @@ class InkFileStorage {
     final data = strokes.map((s) => s.toMap()).toList();
     final jsonString = jsonEncode(data);
 
-    if (finalFile.existsSync()) {
-      finalFile.copySync(bakFile.path);
-    }
+    try {
+      if (finalFile.existsSync()) {
+        finalFile.copySync(bakFile.path);
+      }
 
-    tmpFile.writeAsStringSync(jsonString);
-    tmpFile.renameSync(finalFile.path);
+      tmpFile.writeAsStringSync(jsonString);
+      tmpFile.renameSync(finalFile.path);
 
-    if (bakFile.existsSync()) {
-      bakFile.deleteSync();
+      // Remove backup only after a confirmed successful rename.
+      if (bakFile.existsSync()) {
+        bakFile.deleteSync();
+      }
+    } catch (e) {
+      // Clean up a partial temp file; leave .ink / .bak intact for recovery.
+      if (tmpFile.existsSync()) {
+        try {
+          tmpFile.deleteSync();
+        } catch (_) {}
+      }
+      rethrow;
     }
   }
 

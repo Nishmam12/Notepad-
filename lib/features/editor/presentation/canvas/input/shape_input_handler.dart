@@ -23,7 +23,7 @@ class ShapeInputHandler {
     this.onPreviewEnd,
   });
 
-  void onPointerDown(PointerDownEvent event) {
+  void onPointerDown(PointerEvent event) {
     _rawPoints.clear();
     final pt = StrokePoint(
       x: event.localPosition.dx,
@@ -34,7 +34,7 @@ class ShapeInputHandler {
     onPreviewPointAdd?.call(pt);
   }
 
-  void onPointerMove(PointerMoveEvent event) {
+  void onPointerMove(PointerEvent event) {
     final pt = StrokePoint(
       x: event.localPosition.dx,
       y: event.localPosition.dy,
@@ -44,7 +44,7 @@ class ShapeInputHandler {
     onPreviewPointAdd?.call(pt);
   }
 
-  void onPointerUp(PointerUpEvent event) async {
+  void onPointerUp(PointerEvent event) {
     final toolState = getToolState();
     final rawOffsets = _rawPoints.map((p) => p.toOffset()).toList();
     if (rawOffsets.isEmpty) return;

@@ -20,7 +20,7 @@ void showTemplatePicker({
     context: context,
     backgroundColor: AppColors.surface,
     shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
     ),
     builder: (context) => _TemplatePickerSheet(
       ref: ref,
@@ -108,9 +108,9 @@ class _TemplatePickerSheet extends StatelessWidget {
             const SizedBox(height: 16),
             Row(
               children: [
-                const Color(0xFFFFFFFF), // White
-                const Color(0xFFFAF7F0), // Cream
-                const Color(0xFF1E1E1E), // Dark
+                AppColors.paperWhite, // White
+                AppColors.paperCream, // Cream
+                AppColors.paperBlush, // Blush
               ].map((color) {
                 final isSelected = currentColor.toARGB32() == color.toARGB32();
                 return GestureDetector(
@@ -185,16 +185,17 @@ class _TemplateCardState extends State<_TemplateCard> {
                 height: cardWidth * 1.3,
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(14),
                   border: Border.all(
                     color: widget.isSelected
                         ? AppColors.accent
                         : AppColors.border,
-                    width: widget.isSelected ? 2 : 1,
+                    width: widget.isSelected ? 1.5 : 1,
                   ),
+                  boxShadow: widget.isSelected ? null : AppColors.shadowCard,
                 ),
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(7),
+                  borderRadius: BorderRadius.circular(13),
                   child: CustomPaint(
                     painter: _TemplatePreviewPainter(type: widget.type),
                     size: Size(cardWidth, cardWidth * 1.3),

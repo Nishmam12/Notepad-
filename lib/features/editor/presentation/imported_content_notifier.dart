@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:ui' as ui;
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -61,13 +62,24 @@ class ImportedContentNotifier extends StateNotifier<ImportedContentState> {
         if (image == null) {
           final absolutePath = '${docsDir.path}/${record.relativeImagePath}';
           final file = File(absolutePath);
-          
+
           if (await file.exists()) {
-            final bytes = await file.readAsBytes();
-            final codec = await ui.instantiateImageCodec(bytes);
-            final frame = await codec.getNextFrame();
-            image = frame.image;
-            await _cacheManager.put(cacheKey, image);
+            // Decode each image in isolation: a single corrupt/truncated file
+            // must not abort loading of the rest of the page's content.
+            try {
+              final bytes = await file.readAsBytes();
+              final codec = await ui.instantiateImageCodec(bytes);
+              try {
+                final frame = await codec.getNextFrame();
+                image = frame.image;
+              } finally {
+                codec.dispose();
+              }
+              await _cacheManager.put(cacheKey, image);
+            } catch (e) {
+              debugPrint('Failed to decode imported image ${record.id}: $e');
+              image = null;
+            }
           }
         }
 

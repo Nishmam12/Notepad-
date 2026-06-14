@@ -118,8 +118,10 @@ class _PageNavigatorWidgetState extends ConsumerState<PageNavigatorWidget> {
                         color: isActive ? AppColors.accent : AppColors.border,
                         width: isActive ? 2 : 1,
                       ),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: isActive ? AppColors.shadowCard : null,
                     ),
+                    clipBehavior: Clip.antiAlias,
                     child: Stack(
                       children: [
                         Positioned.fill(
@@ -142,15 +144,15 @@ class _PageNavigatorWidgetState extends ConsumerState<PageNavigatorWidget> {
                           bottom: 4,
                           right: 4,
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                             decoration: BoxDecoration(
-                              color: AppColors.surface.withValues(alpha: 0.8),
-                              borderRadius: BorderRadius.circular(4),
+                              color: AppColors.textPrimary.withValues(alpha: 0.78),
+                              borderRadius: BorderRadius.circular(6),
                             ),
                             child: Text(
                               '${index + 1}',
                               style: const TextStyle(
-                                color: AppColors.textPrimary,
+                                color: AppColors.surface,
                                 fontSize: 10,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -173,10 +175,11 @@ class _PageNavigatorWidgetState extends ConsumerState<PageNavigatorWidget> {
             ),
             child: FloatingActionButton(
               heroTag: null,
-              backgroundColor: AppColors.surfaceHighlight,
+              backgroundColor: AppColors.accentWash,
+              foregroundColor: AppColors.accent,
               elevation: 0,
               onPressed: () => ref.read(pageProvider(widget.notebookId).notifier).insertPage(),
-              child: const Icon(Icons.add, color: AppColors.textPrimary),
+              child: const Icon(Icons.add),
             ),
           ),
         ],

@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../selection_notifier.dart';
-import '../../domain/undo_redo/lasso_move_command.dart';
+import '../../domain/undo_redo/lasso_transform_command.dart';
 import '../../domain/undo_redo/lasso_delete_command.dart';
 import '../../domain/undo_redo/undo_redo_stack.dart';
 import '../canvas_notifier.dart';
@@ -142,15 +142,21 @@ class _SelectionOverlayState extends ConsumerState<SelectionOverlay> {
                   ref.read(selectionProvider.notifier).clearSelection();
                 },
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                   decoration: BoxDecoration(
                     color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(999),
                     border: Border.all(color: AppColors.border),
+                    boxShadow: AppColors.shadowCard,
                   ),
                   child: const Text(
                     'Deselect',
-                    style: TextStyle(color: AppColors.textPrimary, fontSize: 12),
+                    style: TextStyle(
+                      fontFamily: 'Poppins',
+                      color: AppColors.textPrimary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ),
@@ -190,35 +196,43 @@ class _SelectionOverlayState extends ConsumerState<SelectionOverlay> {
   }
 
   void _commitTransform(SelectionState state) {
+    // Read the live transform (scale + translation) BEFORE endTransform resets it.
+    // During a drag only the SelectionNotifier bounds/scale/translation change —
+    // the actual stroke/shape models are untouched until the command executes.
+    final live = ref.read(selectionProvider);
+    final scale = live.currentScale;
+    final translation = live.currentTranslation;
+    final center = _initialBounds?.center;
+    final strokeIds = live.selectedStrokeIds;
+    final shapeIds = live.selectedShapeIds;
+
     ref.read(selectionProvider.notifier).endTransform();
     _dragStart = null;
-    
-    // We don't have cumulative delta easily tracked here for the command unless we keep track of it.
-    // Wait, the prompt says "On move gesture: call selectionProvider.notifier.moveSelection(delta) then commit a LassoMoveCommand."
-    // Actually, `SelectionState` selectionBounds tells us the total move if we compare it to initial bounds.
-    if (_initialBounds != null && state.selectionBounds != null) {
-      final totalDelta = state.selectionBounds!.inflate(4.0).topLeft - _initialBounds!.topLeft;
-      if (totalDelta.distance > 0.1) {
-        final strokeDeltas = {for (var id in state.selectedStrokeIds) id: totalDelta};
-        final shapeDeltas = {for (var id in state.selectedShapeIds) id: totalDelta};
-        
-        final canvasNotifier = ref.read(canvasStateProvider(widget.pageIndex).notifier);
-        final shapeNotifier = ref.read(shapeProvider(widget.pageIndex).notifier);
-        
-        final command = LassoMoveCommand(
-          canvasNotifier: canvasNotifier,
-          shapeNotifier: shapeNotifier,
-          strokeDeltas: strokeDeltas,
-          shapeDeltas: shapeDeltas,
-          strokesSnapshot: ref.read(canvasStateProvider(widget.pageIndex)).completedStrokes,
-          shapesSnapshot: ref.read(shapeProvider(widget.pageIndex)).shapes,
-        );
-        ref.read(undoRedoProvider(widget.pageIndex).notifier).push(command);
-        command.execute(); 
-        // Note: moving elements modifies their actual model, so we must execute it to apply the permanent move.
-        // Wait, moveSelection only moved the bounds? Yes! SelectionNotifier only moves bounds. The model wasn't updated!
-        // So executing the command updates the models!
-      }
+
+    final hasScale = (scale - 1.0).abs() > 0.001;
+    final hasMove = translation.distance > 0.1;
+
+    if ((hasScale || hasMove) &&
+        center != null &&
+        (strokeIds.isNotEmpty || shapeIds.isNotEmpty)) {
+      final canvasNotifier = ref.read(canvasStateProvider(widget.pageIndex).notifier);
+      final shapeNotifier = ref.read(shapeProvider(widget.pageIndex).notifier);
+
+      // Snapshot the original (pre-transform) models; the command applies the
+      // affine map on execute and restores this snapshot on undo.
+      final command = LassoTransformCommand(
+        canvasNotifier: canvasNotifier,
+        shapeNotifier: shapeNotifier,
+        center: center,
+        scale: scale,
+        translation: translation,
+        strokeIds: strokeIds,
+        shapeIds: shapeIds,
+        strokesSnapshot: ref.read(canvasStateProvider(widget.pageIndex)).completedStrokes,
+        shapesSnapshot: ref.read(shapeProvider(widget.pageIndex)).shapes,
+      );
+      ref.read(undoRedoProvider(widget.pageIndex).notifier).push(command);
+      command.execute();
     }
     _initialBounds = null;
   }

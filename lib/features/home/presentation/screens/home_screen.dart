@@ -22,12 +22,24 @@ class HomeScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'InkFlow',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 24,
-            letterSpacing: -0.5,
+        title: const Text.rich(
+          TextSpan(
+            style: TextStyle(
+              fontFamily: 'Poppins',
+              fontWeight: FontWeight.w700,
+              fontSize: 24,
+              letterSpacing: -0.5,
+            ),
+            children: [
+              TextSpan(
+                text: 'Ink',
+                style: TextStyle(color: AppColors.accent),
+              ),
+              TextSpan(
+                text: 'flow',
+                style: TextStyle(color: AppColors.textPrimary),
+              ),
+            ],
           ),
         ),
         centerTitle: false,
@@ -60,10 +72,10 @@ class HomeScreen extends ConsumerWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(
+          Icon(
             Icons.note_add_outlined,
             size: 72,
-            color: AppColors.textMuted,
+            color: AppColors.accent.withValues(alpha: 0.55),
           ),
           const SizedBox(height: 16),
           Text(
@@ -231,8 +243,9 @@ class _NotebookCard extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           color: AppColors.surface,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(18),
           border: Border.all(color: AppColors.border),
+          boxShadow: AppColors.shadowCard,
         ),
         child: Padding(
           padding: const EdgeInsets.all(16),

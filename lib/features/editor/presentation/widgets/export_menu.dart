@@ -29,8 +29,10 @@ class ExportMenu extends StatelessWidget {
     return PopupMenuButton<_ExportAction>(
       icon: const Icon(Icons.more_vert),
       color: AppColors.surface,
+      elevation: 3,
+      shadowColor: AppColors.shadowTint.withValues(alpha: 0.12),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         side: const BorderSide(color: AppColors.border),
       ),
       onSelected: (action) => _handleExport(context, action),

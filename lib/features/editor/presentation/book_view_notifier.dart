@@ -28,13 +28,16 @@ class BookViewNotifier extends StateNotifier<BookViewState> {
   List<int> get pagesForSpread => calculateSpreadPages(state.currentSpread);
 
   List<int> calculateSpreadPages(int spreadIndex) {
-    final left = spreadIndex * 2;
-    final right = spreadIndex * 2 + 1;
+    // Real-book layout: the cover (page 0) sits alone on the right of spread 0,
+    // then pages pair up (1,2), (3,4), … A left index of -1 marks the empty
+    // slot beside the cover.
+    final left = spreadIndex * 2 - 1;
+    final right = spreadIndex * 2;
     return [left, right];
   }
 
   void nextSpread() {
-    final maxSpread = (state.totalPages - 1) ~/ 2;
+    final maxSpread = state.totalPages ~/ 2;
     if (state.currentSpread < maxSpread) {
       state = BookViewState(
         currentSpread: state.currentSpread + 1,
@@ -55,8 +58,9 @@ class BookViewNotifier extends StateNotifier<BookViewState> {
   /// Jumps to the spread that contains the given pageIndex
   void jumpToPage(int pageIndex) {
     if (pageIndex < 0 || pageIndex >= state.totalPages) return;
-    
-    final targetSpread = pageIndex ~/ 2;
+
+    // Inverse of calculateSpreadPages: page 0 -> spread 0; pages 1,2 -> 1; etc.
+    final targetSpread = (pageIndex + 1) ~/ 2;
     if (targetSpread != state.currentSpread) {
       state = BookViewState(
         currentSpread: targetSpread,

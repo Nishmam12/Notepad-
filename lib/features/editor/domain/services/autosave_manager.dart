@@ -66,6 +66,9 @@ class AutosaveManager {
     required PageRepository pageRepo,
     required VoidCallback onSaveComplete,
   }) async {
+    // A forced save supersedes any pending debounced save; cancel it so it can't
+    // fire again later against torn-down providers with stale data.
+    _debounceTimer?.cancel();
     if (_isSaving) return;
     _isSaving = true;
 

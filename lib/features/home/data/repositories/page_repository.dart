@@ -10,24 +10,24 @@ class PageRepository {
 
   PageRepository(this._isar);
 
-  /// Checks contiguity of page indexes in debug mode.
+  /// Ensures page indexes are strictly contiguous (0..n-1). Idempotent and
+  /// awaited: it loads the pages, gathers any whose index is wrong, and writes
+  /// the corrections in a single transaction. Called after each mutating
+  /// transaction, so it never nests inside another write.
   Future<void> _enforceContiguity(int notebookId) async {
-    assert(() {
-      // Wrapped in a self-executing future only evaluated in debug mode
-      () async {
-        final pages = await getPagesForNotebook(notebookId);
-        for (int i = 0; i < pages.length; i++) {
-          if (pages[i].pageIndex != i) {
-            // Contiguity violation found, auto-fixing by updating index
-            pages[i].pageIndex = i;
-            await _isar.writeTxn(() async {
-              await _isar.notePages.put(pages[i]);
-            });
-          }
-        }
-      }();
-      return true;
-    }());
+    final pages = await getPagesForNotebook(notebookId);
+    final fixes = <NotePage>[];
+    for (int i = 0; i < pages.length; i++) {
+      if (pages[i].pageIndex != i) {
+        pages[i].pageIndex = i;
+        fixes.add(pages[i]);
+      }
+    }
+    if (fixes.isNotEmpty) {
+      await _isar.writeTxn(() async {
+        await _isar.notePages.putAll(fixes);
+      });
+    }
   }
 
   /// Creates a page at the end of the notebook.
@@ -107,8 +107,12 @@ class PageRepository {
           .sortByPageIndex()
           .findAll();
 
+      // Guard against out-of-range indices to avoid a RangeError.
+      if (oldIndex < 0 || oldIndex >= pages.length) return;
+      final clampedNew = newIndex.clamp(0, pages.length - 1);
+
       final page = pages.removeAt(oldIndex);
-      pages.insert(newIndex, page);
+      pages.insert(clampedNew, page);
 
       for (int i = 0; i < pages.length; i++) {
         if (pages[i].pageIndex != i) {

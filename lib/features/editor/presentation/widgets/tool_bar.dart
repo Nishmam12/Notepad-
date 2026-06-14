@@ -49,15 +49,9 @@ class _ToolBarState extends ConsumerState<ToolBar> {
           ),
           decoration: BoxDecoration(
             color: AppColors.surface,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(999),
             border: Border.all(color: AppColors.border),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.3),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-              ),
-            ],
+            boxShadow: AppColors.shadowFloat,
           ),
           child: SingleChildScrollView(
             scrollDirection: isTablet ? Axis.vertical : Axis.horizontal,
@@ -238,24 +232,13 @@ class _ToolBarState extends ConsumerState<ToolBar> {
   }
 
   void _showColorPicker(BuildContext context, WidgetRef ref) {
-    final colors = [
-      Colors.black,
-      Colors.white,
-      const Color(0xFFF85149), // red
-      const Color(0xFFE3B341), // yellow
-      const Color(0xFF3FB950), // green
-      const Color(0xFF58A6FF), // blue
-      const Color(0xFFBC8CFF), // purple
-      const Color(0xFFFF7B72), // coral
-      const Color(0xFF79C0FF), // light blue
-      const Color(0xFFFFA657), // orange
-    ];
+    const colors = AppColors.penPalette;
 
     showModalBottomSheet(
       context: context,
       backgroundColor: AppColors.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (context) => Padding(
         padding: const EdgeInsets.all(24),
@@ -331,14 +314,15 @@ class _ToolButton extends StatelessWidget {
       message: tooltip,
       child: GestureDetector(
         onTap: onTap,
-        child: Container(
-          width: 36,
-          height: 36,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 140),
+          width: 40,
+          height: 40,
           decoration: BoxDecoration(
             color: isActive
                 ? activeColor.withValues(alpha: 0.15)
                 : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(14),
           ),
           child: Icon(
             icon,

@@ -34,7 +34,7 @@ class PageThumbnailService {
     final canvas = ui.Canvas(recorder);
     canvas.drawRect(
       ui.Offset.zero & size,
-      ui.Paint()..color = const ui.Color(0xFF0D1117), // AppColors.background
+      ui.Paint()..color = const ui.Color(0xFFFFFFFF), // paper white (warm theme)
     );
 
     // Draw imported contents first (Layer 1)
@@ -141,18 +141,26 @@ class PageThumbnailService {
     }
 
     final picture = recorder.endRecording();
-    // Use a smaller scale for the thumbnail (e.g., 1/4 size) to save memory
-    final img = await picture.toImage(
-      (size.width * 0.25).toInt(),
-      (size.height * 0.25).toInt(),
-    );
+    // Use a smaller scale for the thumbnail (e.g., 1/4 size) to save memory.
+    ui.Image? img;
+    Uint8List bytes;
+    try {
+      img = await picture.toImage(
+        (size.width * 0.25).toInt(),
+        (size.height * 0.25).toInt(),
+      );
 
-    // 2. Encode to PNG asynchronously (this is the heavy part)
-    final byteData = await img.toByteData(format: ui.ImageByteFormat.png);
-    if (byteData == null) return;
+      // 2. Encode to PNG asynchronously (this is the heavy part)
+      final byteData = await img.toByteData(format: ui.ImageByteFormat.png);
+      if (byteData == null) return;
+      bytes = byteData.buffer.asUint8List();
+    } finally {
+      // Dispose the locally-created handles regardless of the encode outcome to
+      // avoid leaking a ui.Image + Picture on every autosave cycle.
+      img?.dispose();
+      picture.dispose();
+    }
 
-    final bytes = byteData.buffer.asUint8List();
-    
     final path = await _thumbnailPath(notebookId, pageIndex);
 
     // 3. Write to disk using compute to prevent IO jank
@@ -170,8 +178,12 @@ class PageThumbnailService {
 
     try {
       final codec = await ui.instantiateImageCodec(bytes);
-      final frame = await codec.getNextFrame();
-      return frame.image;
+      try {
+        final frame = await codec.getNextFrame();
+        return frame.image;
+      } finally {
+        codec.dispose();
+      }
     } catch (e) {
       // If the image is corrupted or incomplete, return null instead of crashing
       return null;

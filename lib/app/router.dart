@@ -20,11 +20,18 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/import/pdf',
       builder: (context, state) {
-        final extra = state.extra as Map<String, dynamic>;
-        return PdfImportScreen(
-          notebookId: extra['notebookId'] as int,
-          initialPageIndex: extra['pageIndex'] as int,
-        );
+        // Guard against missing/malformed `extra` (e.g. deep links) instead of
+        // casting blindly, which would throw and crash navigation.
+        final extra = state.extra;
+        if (extra is Map &&
+            extra['notebookId'] is int &&
+            extra['pageIndex'] is int) {
+          return PdfImportScreen(
+            notebookId: extra['notebookId'] as int,
+            initialPageIndex: extra['pageIndex'] as int,
+          );
+        }
+        return const HomeScreen();
       },
     ),
     GoRoute(

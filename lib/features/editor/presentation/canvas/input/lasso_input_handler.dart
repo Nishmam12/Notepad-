@@ -22,18 +22,18 @@ class LassoInputHandler {
     required this.getCurrentShapes,
   });
 
-  void onPointerDown(PointerDownEvent event) {
+  void onPointerDown(PointerEvent event) {
     _lassoPath.clear();
     _lassoPath.add(event.localPosition);
     onLassoUpdate(List.from(_lassoPath));
   }
 
-  void onPointerMove(PointerMoveEvent event) {
+  void onPointerMove(PointerEvent event) {
     _lassoPath.add(event.localPosition);
     onLassoUpdate(List.from(_lassoPath));
   }
 
-  void onPointerUp(PointerUpEvent event) async {
+  void onPointerUp(PointerEvent event) async {
     if (_lassoPath.length < 3) {
       _lassoPath.clear();
       onLassoUpdate([]);

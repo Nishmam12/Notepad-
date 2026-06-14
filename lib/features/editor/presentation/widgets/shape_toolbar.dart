@@ -30,15 +30,9 @@ class ShapeToolbar extends ConsumerWidget {
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
               decoration: BoxDecoration(
                 color: AppColors.surface,
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(999),
                 border: Border.all(color: AppColors.border, width: 1),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.surface.withValues(alpha: 0.95),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
+                boxShadow: AppColors.shadowFloat,
               ),
               child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
@@ -74,15 +68,15 @@ class ShapeToolbar extends ConsumerWidget {
         margin: const EdgeInsets.symmetric(horizontal: 4),
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.accent.withValues(alpha: 0.2) : Colors.transparent,
-          borderRadius: BorderRadius.circular(6),
+          color: isSelected ? AppColors.accentWash : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSelected ? AppColors.accent : Colors.transparent,
           ),
         ),
         child: Icon(
           icon,
-          color: isSelected ? AppColors.accent : AppColors.textPrimary,
+          color: isSelected ? AppColors.accent : AppColors.textSecondary,
           size: 20,
         ),
       ),

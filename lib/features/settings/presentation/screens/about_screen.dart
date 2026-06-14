@@ -32,13 +32,24 @@ class AboutScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 24),
-            const Text(
-              'InkFlow',
-              style: TextStyle(
-                fontSize: 32,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
-                letterSpacing: -1,
+            const Text.rich(
+              TextSpan(
+                style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 32,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -1,
+                ),
+                children: [
+                  TextSpan(
+                    text: 'Ink',
+                    style: TextStyle(color: AppColors.accent),
+                  ),
+                  TextSpan(
+                    text: 'flow',
+                    style: TextStyle(color: AppColors.textPrimary),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 8),

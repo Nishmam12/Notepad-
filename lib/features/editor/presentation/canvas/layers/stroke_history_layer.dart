@@ -8,8 +8,12 @@ import 'dart:ui' as ui;
 import '../../../domain/models/stroke.dart';
 import '../../selection_notifier.dart';
 
-// A cache for generated paths to prevent recalculating `perfect_freehand` every frame.
-final Map<String, Path> _pathCache = {};
+// A cache for generated paths to prevent recalculating `perfect_freehand` every
+// frame. Keyed by the Stroke *object* (not its id) via an Expando: a stroke that
+// is moved/scaled is a new object produced by copyWith, so it misses the cache
+// and its path is recomputed at the new geometry. Superseded strokes are GC'd
+// along with their cached path, so the cache cannot grow unbounded.
+final Expando<Path> _pathCache = Expando<Path>();
 
 class StrokePictureCache {
   static ui.Picture? picture;
@@ -119,7 +123,7 @@ class StrokeHistoryLayer extends CustomPainter {
       ..blendMode = stroke.isEraser ? BlendMode.clear : BlendMode.srcOver
       ..style = PaintingStyle.fill;
 
-    Path? path = _pathCache[stroke.id];
+    Path? path = _pathCache[stroke];
     if (path == null) {
       final inputPoints = stroke.points
           .map((p) => PointVector(p.x, p.y, p.pressure))
@@ -139,7 +143,7 @@ class StrokeHistoryLayer extends CustomPainter {
 
       if (outlinePoints.isEmpty) return;
       path = _buildPath(outlinePoints);
-      _pathCache[stroke.id] = path;
+      _pathCache[stroke] = path;
     }
 
     canvas.drawPath(path, paint);
