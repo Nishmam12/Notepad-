@@ -92,6 +92,7 @@ class ShapeLayer extends CustomPainter {
 
       case ShapeType.triangle:
       case ShapeType.polygon:
+      case ShapeType.diamond:
         final vertices = ShapeGeometry.verticesFromGeometry(shape.geometryData);
         if (vertices.isNotEmpty) {
           final path = Path()..addPolygon(vertices, true);

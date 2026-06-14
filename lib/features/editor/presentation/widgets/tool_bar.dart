@@ -108,6 +108,16 @@ class _ToolBarState extends ConsumerState<ToolBar> {
                   onTap: () => ref.read(toolProvider.notifier).setLassoTool(),
                   tooltip: 'Lasso Selection',
                 ),
+                const SizedBox(width: 4),
+
+                // Hand tool (pan/zoom)
+                _ToolButton(
+                  icon: Icons.pan_tool_outlined,
+                  isActive: toolState.activeTool == ToolType.hand,
+                  activeColor: AppColors.accentYellow,
+                  onTap: () => ref.read(toolProvider.notifier).setHandTool(),
+                  tooltip: 'Pan (Hand Tool)',
+                ),
                 isTablet ? const SizedBox(height: 12) : const SizedBox(width: 12),
 
                 // Divider

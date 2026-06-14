@@ -1,5 +1,6 @@
 // Stroke history layer — draws all completed strokes using perfect_freehand.
 
+import 'dart:math' show sin, pi;
 import 'package:flutter/material.dart';
 import 'package:perfect_freehand/perfect_freehand.dart';
 
@@ -129,14 +130,16 @@ class StrokeHistoryLayer extends CustomPainter {
           .map((p) => PointVector(p.x, p.y, p.pressure))
           .toList();
 
+      final simulate = stroke.points.first.simulatePressure;
       final outlinePoints = getStroke(
         inputPoints,
         options: StrokeOptions(
           size: stroke.size,
-          thinning: 0.7,
+          thinning: 0.6,
           smoothing: 0.5,
           streamline: 0.5,
-          simulatePressure: false,
+          easing: (t) => sin(t * pi / 2),
+          simulatePressure: simulate,
           isComplete: true,
         ),
       );

@@ -1,4 +1,3 @@
-import 'package:flutter/gestures.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:inkflow/features/editor/domain/models/shape_element.dart';
@@ -8,11 +7,11 @@ import 'package:inkflow/features/editor/presentation/canvas/input/shape_input_ha
 import 'package:inkflow/features/editor/presentation/canvas/input/lasso_input_handler.dart';
 
 void main() {
-  // Regression for BUG-1: pointer events are now typed as PointerEvent, so a
-  // PointerCancelEvent (delivered via Listener.onPointerCancel → onPointerUp)
-  // must not throw a cast error.
-  group('Input handlers tolerate PointerCancelEvent', () {
-    test('ShapeInputHandler.onPointerUp accepts a cancel event', () {
+  // Handlers now accept StrokePoint / Offset (scene-space coordinates) directly,
+  // so there is no PointerEvent cast risk. These tests verify that the handlers
+  // complete normally and produce the expected output.
+  group('Input handlers accept scene-space coordinates', () {
+    test('ShapeInputHandler.onPointerUp finalises a shape from StrokePoints', () {
       ShapeElement? recognised;
       final handler = ShapeInputHandler(
         onShapeRecognised: (s) => recognised = s,
@@ -20,18 +19,18 @@ void main() {
         getToolState: () => const ToolState(),
       );
 
-      handler.onPointerDown(const PointerDownEvent(position: Offset(0, 0)));
-      handler.onPointerMove(const PointerMoveEvent(position: Offset(60, 60)));
+      handler.onPointerDown(const StrokePoint(x: 0, y: 0));
+      handler.onPointerMove(const StrokePoint(x: 60, y: 60));
 
       expect(
-        () => handler.onPointerUp(const PointerCancelEvent(position: Offset(60, 60))),
+        () => handler.onPointerUp(const StrokePoint(x: 60, y: 60)),
         returnsNormally,
       );
-      // A line shape was finalized from the cancelled gesture.
+      // A line shape was finalised from the gesture.
       expect(recognised, isNotNull);
     });
 
-    test('LassoInputHandler.onPointerUp accepts a cancel event', () {
+    test('LassoInputHandler.onPointerUp with fewer than 3 points returns normally', () {
       final handler = LassoInputHandler(
         onLassoComplete: (_, __) {},
         onLassoUpdate: (_) {},
@@ -39,17 +38,15 @@ void main() {
         getCurrentShapes: () => const [],
       );
 
-      handler.onPointerDown(const PointerDownEvent(position: Offset(0, 0)));
+      handler.onPointerDown(const Offset(0, 0));
 
-      // Fewer than 3 points → early return (no isolate work); just assert the
-      // cancel event does not throw.
       expect(
-        () => handler.onPointerUp(const PointerCancelEvent(position: Offset(0, 0))),
+        () => handler.onPointerUp(const Offset(0, 0)),
         returnsNormally,
       );
     });
 
-    test('ShapeInputHandler still records points from base PointerEvents', () {
+    test('ShapeInputHandler records StrokePoint positions via onPreviewPointAdd', () {
       final added = <StrokePoint>[];
       final handler = ShapeInputHandler(
         onShapeRecognised: (_) {},
@@ -58,8 +55,8 @@ void main() {
         onPreviewPointAdd: added.add,
       );
 
-      handler.onPointerDown(const PointerDownEvent(position: Offset(1, 2)));
-      handler.onPointerMove(const PointerMoveEvent(position: Offset(3, 4)));
+      handler.onPointerDown(const StrokePoint(x: 1, y: 2));
+      handler.onPointerMove(const StrokePoint(x: 3, y: 4));
 
       expect(added.length, 2);
       expect(added.first.x, 1);

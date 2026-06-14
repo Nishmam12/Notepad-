@@ -6,11 +6,16 @@ class StrokePoint {
   final double x;
   final double y;
   final double pressure;
+  // True when hardware does not supply real pressure (defaults to 0.5).
+  // Mirrors Excalidraw's simulatePressure flag — lets perfect_freehand
+  // generate its own thinning curve instead of using the flat 0.5 value.
+  final bool simulatePressure;
 
   const StrokePoint({
     required this.x,
     required this.y,
     this.pressure = 0.5,
+    this.simulatePressure = false,
   });
 
   /// Creates a StrokePoint from a map (for deserialization).
@@ -19,6 +24,7 @@ class StrokePoint {
       x: (map['x'] as num).toDouble(),
       y: (map['y'] as num).toDouble(),
       pressure: (map['p'] as num?)?.toDouble() ?? 0.5,
+      simulatePressure: map['sim'] as bool? ?? false,
     );
   }
 
@@ -28,6 +34,7 @@ class StrokePoint {
       'x': x,
       'y': y,
       'p': pressure,
+      if (simulatePressure) 'sim': true,
     };
   }
 
@@ -35,11 +42,13 @@ class StrokePoint {
     double? x,
     double? y,
     double? pressure,
+    bool? simulatePressure,
   }) {
     return StrokePoint(
       x: x ?? this.x,
       y: y ?? this.y,
       pressure: pressure ?? this.pressure,
+      simulatePressure: simulatePressure ?? this.simulatePressure,
     );
   }
 

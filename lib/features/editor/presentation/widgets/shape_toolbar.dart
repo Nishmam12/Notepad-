@@ -45,6 +45,7 @@ class ShapeToolbar extends ConsumerWidget {
                     _buildShapeBtn(ref, toolState, ShapeType.rectangle, Icons.crop_square),
                     _buildShapeBtn(ref, toolState, ShapeType.triangle, Icons.change_history),
                     _buildShapeBtn(ref, toolState, ShapeType.polygon, Icons.pentagon_outlined),
+                    _buildShapeBtn(ref, toolState, ShapeType.diamond, Icons.diamond_outlined),
                     _buildShapeBtn(ref, toolState, ShapeType.textBox, Icons.title),
                     // SVGs are imported via bottom sheet, but we can have an icon here as well or omit. The prompt says: "8 icons for line, arrow, circle, rectangle, triangle, polygon, textBox, SVG".
                     _buildShapeBtn(ref, toolState, ShapeType.svgImage, Icons.image_outlined),

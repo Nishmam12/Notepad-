@@ -86,6 +86,7 @@ LassoHitResult testLasso({
         break;
       case ShapeType.triangle:
       case ShapeType.polygon:
+      case ShapeType.diamond:
         final vertices = ShapeGeometry.verticesFromGeometry(shape.geometryData);
         centroid = ShapeGeometry.centroid(vertices);
         break;

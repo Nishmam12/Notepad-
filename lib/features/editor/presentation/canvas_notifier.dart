@@ -39,6 +39,7 @@ enum ToolType {
   eraser,
   shape,
   lasso,
+  hand, // pan/zoom — no drawing
 }
 
 
@@ -92,8 +93,14 @@ class ToolState {
 class CanvasStateNotifier extends StateNotifier<CanvasState> {
   CanvasStateNotifier() : super(const CanvasState());
 
-  /// Adds a point to the current in-progress stroke.
+  /// Adds a point to the current in-progress stroke, discarding sub-pixel duplicates.
   void addPoint(StrokePoint point) {
+    if (state.currentStrokePoints.isNotEmpty) {
+      final last = state.currentStrokePoints.last;
+      final dx = point.x - last.x;
+      final dy = point.y - last.y;
+      if (dx * dx + dy * dy < 0.25) return; // skip points within 0.5px
+    }
     state = state.copyWith(
       currentStrokePoints: [...state.currentStrokePoints, point],
     );
@@ -237,6 +244,7 @@ class ToolNotifier extends StateNotifier<ToolState> {
   void setEraser() => state = state.copyWith(isEraser: true, activeTool: ToolType.eraser);
   void setShapeTool() => state = state.copyWith(isEraser: false, activeTool: ToolType.shape);
   void setLassoTool() => state = state.copyWith(isEraser: false, activeTool: ToolType.lasso);
+  void setHandTool() => state = state.copyWith(isEraser: false, activeTool: ToolType.hand);
   void setShapeType(ShapeType type) => state = state.copyWith(selectedShapeType: type);
   void setTemplate(TemplateType template) =>
       state = state.copyWith(template: template);

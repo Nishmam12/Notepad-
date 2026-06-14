@@ -1,11 +1,11 @@
-import 'package:flutter/gestures.dart';
+import 'dart:math';
+import 'dart:ui' show Offset;
 import '../../../domain/models/shape_element.dart';
 import '../../../domain/models/stroke_point.dart';
 import '../../../domain/models/shape_type.dart';
 import '../../../domain/services/shape_recognizer.dart';
 import '../../../domain/services/shape_geometry.dart';
 import '../../canvas_notifier.dart';
-import 'dart:math';
 
 class ShapeInputHandler {
   final void Function(ShapeElement shape) onShapeRecognised;
@@ -23,28 +23,18 @@ class ShapeInputHandler {
     this.onPreviewEnd,
   });
 
-  void onPointerDown(PointerEvent event) {
+  void onPointerDown(StrokePoint scenePoint) {
     _rawPoints.clear();
-    final pt = StrokePoint(
-      x: event.localPosition.dx,
-      y: event.localPosition.dy,
-      pressure: event.pressure,
-    );
-    _rawPoints.add(pt);
-    onPreviewPointAdd?.call(pt);
+    _rawPoints.add(scenePoint);
+    onPreviewPointAdd?.call(scenePoint);
   }
 
-  void onPointerMove(PointerEvent event) {
-    final pt = StrokePoint(
-      x: event.localPosition.dx,
-      y: event.localPosition.dy,
-      pressure: event.pressure,
-    );
-    _rawPoints.add(pt);
-    onPreviewPointAdd?.call(pt);
+  void onPointerMove(StrokePoint scenePoint) {
+    _rawPoints.add(scenePoint);
+    onPreviewPointAdd?.call(scenePoint);
   }
 
-  void onPointerUp(PointerEvent event) {
+  void onPointerUp(StrokePoint scenePoint) {
     final toolState = getToolState();
     final rawOffsets = _rawPoints.map((p) => p.toOffset()).toList();
     if (rawOffsets.isEmpty) return;
@@ -61,7 +51,6 @@ class ShapeInputHandler {
     }
 
     if (toolState.selectedShapeType == ShapeType.svgImage) {
-      // SVG handled externally, but we can emit a placeholder rect
       final center = rawOffsets.first;
       final geom = [center.dx, center.dy, center.dx + 100, center.dy + 100];
       final shape = _buildShapeElement(RecognitionResult(ShapeType.svgImage, geom), toolState);
@@ -76,8 +65,6 @@ class ShapeInputHandler {
       return;
     }
 
-    // Instead of using recogniseShape for 'polygon' when it's selected, draw a pentagon.
-    // If we want to use the magic recogniser, we could do it when no specific shape is selected.
     final type = toolState.selectedShapeType;
     final rect = ShapeGeometry.boundingRect(rawOffsets);
     final first = rawOffsets.first;
@@ -109,6 +96,11 @@ class ShapeInputHandler {
         geom.add(cx + cos(angle) * rx);
         geom.add(cy + sin(angle) * ry);
       }
+    } else if (type == ShapeType.diamond) {
+      // Excalidraw-style 4-vertex diamond: top, right, bottom, left
+      final cx = rect.center.dx;
+      final cy = rect.center.dy;
+      geom = [cx, rect.top, rect.right, cy, cx, rect.bottom, rect.left, cy];
     } else {
       geom = [rect.left, rect.top, rect.right, rect.bottom];
     }
@@ -119,14 +111,14 @@ class ShapeInputHandler {
   }
 
   ShapeElement _buildShapeElement(RecognitionResult result, ToolState toolState) {
-    final id = DateTime.now().millisecondsSinceEpoch.toString(); // or uuid
-    
+    final id = DateTime.now().millisecondsSinceEpoch.toString();
+
     return ShapeElement()
       ..id = id
       ..type = result.type
       ..color = toolState.color.toARGB32()
       ..strokeWidth = toolState.size
-      ..hasFill = false // toolState.hasFill if available
+      ..hasFill = false
       ..fillColor = toolState.color.toARGB32()
       ..opacity = 1.0
       ..rotation = 0.0

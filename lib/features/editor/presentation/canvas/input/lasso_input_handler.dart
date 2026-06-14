@@ -1,5 +1,4 @@
 import 'package:flutter/foundation.dart';
-import 'package:flutter/gestures.dart';
 import 'dart:ui';
 import '../../../domain/models/stroke.dart';
 import '../../../domain/models/shape_element.dart';
@@ -22,18 +21,18 @@ class LassoInputHandler {
     required this.getCurrentShapes,
   });
 
-  void onPointerDown(PointerEvent event) {
+  void onPointerDown(Offset sceneOffset) {
     _lassoPath.clear();
-    _lassoPath.add(event.localPosition);
+    _lassoPath.add(sceneOffset);
     onLassoUpdate(List.from(_lassoPath));
   }
 
-  void onPointerMove(PointerEvent event) {
-    _lassoPath.add(event.localPosition);
+  void onPointerMove(Offset sceneOffset) {
+    _lassoPath.add(sceneOffset);
     onLassoUpdate(List.from(_lassoPath));
   }
 
-  void onPointerUp(PointerEvent event) async {
+  void onPointerUp(Offset sceneOffset) async {
     if (_lassoPath.length < 3) {
       _lassoPath.clear();
       onLassoUpdate([]);
@@ -55,10 +54,9 @@ class LassoInputHandler {
       final bounds = _computeSelectionBounds(result, currentStrokes, currentShapes);
       onLassoComplete(result, bounds);
     } else {
-      // Clear selection if tapping/lassoing empty space
       onLassoComplete(result, Rect.zero);
     }
-    
+
     _lassoPath.clear();
     onLassoUpdate([]);
   }
@@ -76,12 +74,10 @@ class LassoInputHandler {
       if (result.selectedShapeIds.contains(shape.id)) {
         final rect = ShapeGeometry.boundingRect(ShapeGeometry.verticesFromGeometry(shape.geometryData));
         if (rect != Rect.zero) {
-           allPoints.add(rect.topLeft);
-           allPoints.add(rect.bottomRight);
+          allPoints.add(rect.topLeft);
+          allPoints.add(rect.bottomRight);
         } else {
-          // Fallback for line/circle geometry parsing
-          final pts = _extractAllGeomPoints(shape);
-          allPoints.addAll(pts);
+          allPoints.addAll(_extractAllGeomPoints(shape));
         }
       }
     }
@@ -91,14 +87,18 @@ class LassoInputHandler {
 
   List<Offset> _extractAllGeomPoints(ShapeElement shape) {
     if (shape.geometryData.isEmpty) return [];
-    if (shape.geometryData.length >= 4 && (shape.type == ShapeType.circle || shape.type == ShapeType.rectangle || shape.type == ShapeType.textBox || shape.type == ShapeType.svgImage)) {
+    if (shape.geometryData.length >= 4 &&
+        (shape.type == ShapeType.circle ||
+            shape.type == ShapeType.rectangle ||
+            shape.type == ShapeType.textBox ||
+            shape.type == ShapeType.svgImage)) {
       final rect = ShapeGeometry.rectFromGeometry(shape.geometryData);
       return [rect.topLeft, rect.bottomRight];
     }
-    
+
     final List<Offset> pts = [];
-    for (int i=0; i<shape.geometryData.length-1; i+=2) {
-      pts.add(Offset(shape.geometryData[i], shape.geometryData[i+1]));
+    for (int i = 0; i < shape.geometryData.length - 1; i += 2) {
+      pts.add(Offset(shape.geometryData[i], shape.geometryData[i + 1]));
     }
     return pts;
   }
