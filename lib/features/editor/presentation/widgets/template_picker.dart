@@ -10,11 +10,12 @@ import '../canvas/layers/template_painter.dart';
 
 /// Shows a bottom sheet with a 2×3 grid of template preview cards and a color selector.
 void showTemplatePicker({
-  required BuildContext context, 
+  required BuildContext context,
   required WidgetRef ref,
   required int notebookId,
   required Color currentColor,
   ValueChanged<Color>? onColorChanged,
+  ValueChanged<TemplateType>? onTemplateChanged,
 }) {
   showModalBottomSheet(
     context: context,
@@ -27,6 +28,7 @@ void showTemplatePicker({
       notebookId: notebookId,
       currentColor: currentColor,
       onColorChanged: onColorChanged,
+      onTemplateChanged: onTemplateChanged,
     ),
   );
 }
@@ -36,12 +38,14 @@ class _TemplatePickerSheet extends StatelessWidget {
   final int notebookId;
   final Color currentColor;
   final ValueChanged<Color>? onColorChanged;
+  final ValueChanged<TemplateType>? onTemplateChanged;
 
   const _TemplatePickerSheet({
     required this.ref,
     required this.notebookId,
     required this.currentColor,
     this.onColorChanged,
+    this.onTemplateChanged,
   });
 
   @override
@@ -90,6 +94,7 @@ class _TemplatePickerSheet extends StatelessWidget {
                   isSelected: type == currentTemplate,
                   onTap: () {
                     ref.read(toolProvider.notifier).setTemplate(type);
+                    onTemplateChanged?.call(type);
                     Navigator.of(context).pop();
                   },
                 );

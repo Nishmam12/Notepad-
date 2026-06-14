@@ -37,8 +37,13 @@ const NotebookSchema = CollectionSchema(
       name: r'pageCount',
       type: IsarType.long,
     ),
-    r'title': PropertySchema(
+    r'templateIndex': PropertySchema(
       id: 4,
+      name: r'templateIndex',
+      type: IsarType.long,
+    ),
+    r'title': PropertySchema(
+      id: 5,
       name: r'title',
       type: IsarType.string,
     )
@@ -91,7 +96,8 @@ void _notebookSerialize(
   writer.writeDateTime(offsets[1], object.createdAt);
   writer.writeDateTime(offsets[2], object.modifiedAt);
   writer.writeLong(offsets[3], object.pageCount);
-  writer.writeString(offsets[4], object.title);
+  writer.writeLong(offsets[4], object.templateIndex);
+  writer.writeString(offsets[5], object.title);
 }
 
 Notebook _notebookDeserialize(
@@ -106,7 +112,8 @@ Notebook _notebookDeserialize(
   object.id = id;
   object.modifiedAt = reader.readDateTime(offsets[2]);
   object.pageCount = reader.readLong(offsets[3]);
-  object.title = reader.readString(offsets[4]);
+  object.templateIndex = reader.readLong(offsets[4]);
+  object.title = reader.readString(offsets[5]);
   return object;
 }
 
@@ -126,6 +133,8 @@ P _notebookDeserializeProp<P>(
     case 3:
       return (reader.readLong(offset)) as P;
     case 4:
+      return (reader.readLong(offset)) as P;
+    case 5:
       return (reader.readString(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -586,6 +595,60 @@ extension NotebookQueryFilter
     });
   }
 
+  QueryBuilder<Notebook, Notebook, QAfterFilterCondition> templateIndexEqualTo(
+      int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'templateIndex',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Notebook, Notebook, QAfterFilterCondition>
+      templateIndexGreaterThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'templateIndex',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Notebook, Notebook, QAfterFilterCondition> templateIndexLessThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'templateIndex',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Notebook, Notebook, QAfterFilterCondition> templateIndexBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'templateIndex',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
   QueryBuilder<Notebook, Notebook, QAfterFilterCondition> titleEqualTo(
     String value, {
     bool caseSensitive = true,
@@ -772,6 +835,18 @@ extension NotebookQuerySortBy on QueryBuilder<Notebook, Notebook, QSortBy> {
     });
   }
 
+  QueryBuilder<Notebook, Notebook, QAfterSortBy> sortByTemplateIndex() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'templateIndex', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Notebook, Notebook, QAfterSortBy> sortByTemplateIndexDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'templateIndex', Sort.desc);
+    });
+  }
+
   QueryBuilder<Notebook, Notebook, QAfterSortBy> sortByTitle() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'title', Sort.asc);
@@ -847,6 +922,18 @@ extension NotebookQuerySortThenBy
     });
   }
 
+  QueryBuilder<Notebook, Notebook, QAfterSortBy> thenByTemplateIndex() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'templateIndex', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Notebook, Notebook, QAfterSortBy> thenByTemplateIndexDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'templateIndex', Sort.desc);
+    });
+  }
+
   QueryBuilder<Notebook, Notebook, QAfterSortBy> thenByTitle() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'title', Sort.asc);
@@ -883,6 +970,12 @@ extension NotebookQueryWhereDistinct
   QueryBuilder<Notebook, Notebook, QDistinct> distinctByPageCount() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'pageCount');
+    });
+  }
+
+  QueryBuilder<Notebook, Notebook, QDistinct> distinctByTemplateIndex() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'templateIndex');
     });
   }
 
@@ -923,6 +1016,12 @@ extension NotebookQueryProperty
   QueryBuilder<Notebook, int, QQueryOperations> pageCountProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'pageCount');
+    });
+  }
+
+  QueryBuilder<Notebook, int, QQueryOperations> templateIndexProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'templateIndex');
     });
   }
 

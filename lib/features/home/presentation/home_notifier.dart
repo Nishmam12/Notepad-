@@ -17,8 +17,8 @@ class HomeNotifier extends StateNotifier<List<Notebook>> {
   }
 
   /// Creates a new notebook and refreshes the list.
-  Future<Notebook> createNotebook(String title) async {
-    final notebook = await _repository.createNotebook(title);
+  Future<Notebook> createNotebook(String title, {int templateIndex = 0}) async {
+    final notebook = await _repository.createNotebook(title, templateIndex: templateIndex);
     await loadNotebooks();
     return notebook;
   }

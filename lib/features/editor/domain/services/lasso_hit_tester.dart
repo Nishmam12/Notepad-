@@ -67,37 +67,46 @@ LassoHitResult testLasso({
     }
   }
 
-  // For each ShapeElement: a shape is selected if its centroid is inside the path.
+  // For each ShapeElement: a shape is selected if ANY of its representative
+  // points (centre, corners, or vertices) falls inside the path. Using more than
+  // just the centroid means a lasso drawn tightly around the *visible* content
+  // (e.g. short text inside a wide text box) still selects the shape.
   for (final shape in shapes) {
-    Offset centroid;
-    
-    switch (shape.type) {
-      case ShapeType.textBox:
-      case ShapeType.svgImage:
-      case ShapeType.circle:
-      case ShapeType.rectangle:
-        final rect = ShapeGeometry.rectFromGeometry(shape.geometryData);
-        centroid = rect.center;
+    for (final point in _shapeTestPoints(shape)) {
+      if (_isPointInPolygon(point, lassoPath)) {
+        selectedShapeIds.add(shape.id);
         break;
-      case ShapeType.line:
-      case ShapeType.arrow:
-        final (start, end) = ShapeGeometry.lineFromGeometry(shape.geometryData);
-        centroid = Offset((start.dx + end.dx) / 2, (start.dy + end.dy) / 2);
-        break;
-      case ShapeType.triangle:
-      case ShapeType.polygon:
-      case ShapeType.diamond:
-        final vertices = ShapeGeometry.verticesFromGeometry(shape.geometryData);
-        centroid = ShapeGeometry.centroid(vertices);
-        break;
-    }
-
-    // Apply rotation if needed to check the actual centroid, although centroid is invariant 
-    // to rotation around itself. We just need its absolute position which is the centroid.
-    if (_isPointInPolygon(centroid, lassoPath)) {
-      selectedShapeIds.add(shape.id);
+      }
     }
   }
 
   return LassoHitResult(selectedStrokeIds, selectedShapeIds);
+}
+
+/// Representative points used to decide whether a shape is captured by a lasso.
+List<Offset> _shapeTestPoints(ShapeElement shape) {
+  switch (shape.type) {
+    case ShapeType.textBox:
+    case ShapeType.svgImage:
+    case ShapeType.circle:
+    case ShapeType.rectangle:
+      final rect = ShapeGeometry.rectFromGeometry(shape.geometryData);
+      return [
+        rect.center,
+        rect.topLeft,
+        rect.topRight,
+        rect.bottomLeft,
+        rect.bottomRight,
+      ];
+    case ShapeType.line:
+    case ShapeType.arrow:
+      final (start, end) = ShapeGeometry.lineFromGeometry(shape.geometryData);
+      return [start, end, Offset((start.dx + end.dx) / 2, (start.dy + end.dy) / 2)];
+    case ShapeType.triangle:
+    case ShapeType.polygon:
+    case ShapeType.diamond:
+      final vertices = ShapeGeometry.verticesFromGeometry(shape.geometryData);
+      if (vertices.isEmpty) return const [];
+      return [...vertices, ShapeGeometry.centroid(vertices)];
+  }
 }

@@ -26,6 +26,8 @@ import '../../domain/services/autosave_manager.dart';
 import '../../data/repositories/shape_repository.dart';
 import '../../domain/models/shape_type.dart';
 import '../../domain/models/shape_element.dart';
+import '../../domain/models/template_type.dart';
+import '../widgets/template_picker.dart';
 import '../../domain/services/shape_geometry.dart';
 import '../shape_notifier.dart';
 import '../selection_notifier.dart';
@@ -36,11 +38,15 @@ import '../../domain/services/lasso_hit_tester.dart';
 import '../widgets/shape_toolbar.dart';
 import '../widgets/selection_overlay.dart' as app_sel;
 import '../widgets/text_box_overlay.dart';
+import '../widgets/text_element_overlay.dart';
 import '../../../home/presentation/home_notifier.dart';
 
 final lassoPreviewProvider = StateProvider.autoDispose<List<Offset>>((ref) => []);
 final activeTextBoxProvider = StateProvider.autoDispose<ShapeElement?>((ref) => null);
 final textBoxRectProvider = StateProvider.autoDispose<Rect?>((ref) => null);
+
+/// Live preview of the shape currently being dragged (null when idle).
+final shapePreviewProvider = StateProvider.autoDispose<ShapeElement?>((ref) => null);
 
 class NoteEditorScreen extends ConsumerStatefulWidget {
   final int notebookId;
@@ -100,13 +106,8 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> with Widget
         _triggerAutosave();
       },
       getToolState: () => ref.read(toolProvider),
-      onPreviewPointAdd: (point) {
-        final currentIndex = ref.read(pageProvider(widget.notebookId)).currentPageIndex;
-        ref.read(canvasStateProvider(currentIndex).notifier).addPoint(point);
-      },
-      onPreviewEnd: () {
-        final currentIndex = ref.read(pageProvider(widget.notebookId)).currentPageIndex;
-        ref.read(canvasStateProvider(currentIndex).notifier).clearCurrentStroke();
+      onPreviewUpdate: (preview) {
+        ref.read(shapePreviewProvider.notifier).state = preview;
       },
     );
 
@@ -127,6 +128,10 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> with Widget
         setState(() {
           _backgroundColor = Color(notebook.backgroundColor);
         });
+        // Restore this notebook's saved page/paper style.
+        const templates = TemplateType.values;
+        final index = notebook.templateIndex.clamp(0, templates.length - 1);
+        ref.read(toolProvider.notifier).setTemplate(templates[index]);
       }
 
       ref.read(pageProvider(widget.notebookId).notifier).initialize().then((_) {
@@ -230,6 +235,13 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> with Widget
     _cacheManager.preloadAdjacent(widget.notebookId, newPageIndex);
   }
 
+  /// Erases both strokes and shapes near [scenePoint] (stroke eraser).
+  void _eraseAt(StrokePoint scenePoint, int pageIndex, double radius) {
+    ref.read(canvasStateProvider(pageIndex).notifier).eraseAtPoint(scenePoint, radius);
+    ref.read(shapeProvider(pageIndex).notifier).eraseAtPoint(scenePoint.toOffset(), radius);
+    _triggerAutosave();
+  }
+
   /// Convert a raw screen-space StrokePoint to scene coordinates using the current viewport.
   StrokePoint _toScene(StrokePoint raw, ViewportState vp) {
     final scene = vp.toScene(Offset(raw.x, raw.y));
@@ -251,6 +263,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> with Widget
     final shapeState = ref.watch(shapeProvider(currentIndex));
     final selectionState = ref.watch(selectionProvider);
     final lassoPreviewPath = ref.watch(lassoPreviewProvider);
+    final shapePreview = ref.watch(shapePreviewProvider);
     final activeTextBox = ref.watch(activeTextBoxProvider);
     final textBoxRect = ref.watch(textBoxRectProvider);
     final viewport = ref.watch(viewportProvider);
@@ -300,6 +313,23 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> with Widget
                 onPressed: () => ref.read(viewportProvider.notifier).reset(),
               ),
             IconButton(
+              icon: const Icon(Icons.dashboard_customize_outlined),
+              tooltip: 'Page Style',
+              onPressed: () => showTemplatePicker(
+                context: context,
+                ref: ref,
+                notebookId: widget.notebookId,
+                currentColor: _backgroundColor,
+                onColorChanged: (color) {
+                  setState(() => _backgroundColor = color);
+                  ref.read(noteRepositoryProvider).updateBackgroundColor(widget.notebookId, color.toARGB32());
+                },
+                onTemplateChanged: (type) {
+                  ref.read(noteRepositoryProvider).updateTemplateIndex(widget.notebookId, type.index);
+                },
+              ),
+            ),
+            IconButton(
               icon: const Icon(Icons.menu_book),
               tooltip: 'Book View',
               onPressed: () {
@@ -348,8 +378,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> with Widget
                       } else if (toolState.activeTool == ToolType.lasso) {
                         _lassoInputHandler.onPointerDown(scenePoint.toOffset());
                       } else if (toolState.isEraser && toolState.eraserType == EraserType.stroke) {
-                        ref.read(canvasStateProvider(currentIndex).notifier).eraseAtPoint(scenePoint, toolState.size * 2);
-                        _triggerAutosave();
+                        _eraseAt(scenePoint, currentIndex, toolState.size * 2);
                       } else {
                         ref.read(canvasStateProvider(currentIndex).notifier).addPoint(scenePoint);
                       }
@@ -361,8 +390,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> with Widget
                       } else if (toolState.activeTool == ToolType.lasso) {
                         _lassoInputHandler.onPointerMove(scenePoint.toOffset());
                       } else if (toolState.isEraser && toolState.eraserType == EraserType.stroke) {
-                        ref.read(canvasStateProvider(currentIndex).notifier).eraseAtPoint(scenePoint, toolState.size * 2);
-                        _triggerAutosave();
+                        _eraseAt(scenePoint, currentIndex, toolState.size * 2);
                       } else {
                         ref.read(canvasStateProvider(currentIndex).notifier).addPoint(scenePoint);
                       }
@@ -409,6 +437,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> with Widget
                           templateType: toolState.template,
                           backgroundColor: _backgroundColor,
                           shapes: shapeState.shapes,
+                          previewShape: shapePreview,
                           selectionState: selectionState,
                           lassoPreviewPath: lassoPreviewPath,
                           pageIndex: currentIndex,
@@ -417,6 +446,14 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> with Widget
                     ),
                   ),
                   FreeImageOverlay(notebookId: widget.notebookId, pageIndex: currentIndex),
+                  TextElementOverlay(
+                    pageIndex: currentIndex,
+                    enabled: toolState.activeTool == ToolType.lasso,
+                    onEdit: (shape) {
+                      ref.read(activeTextBoxProvider.notifier).state = shape;
+                    },
+                    onChanged: _triggerAutosave,
+                  ),
                   app_sel.SelectionOverlay(pageIndex: currentIndex),
                   if (activeTextBox != null || textBoxRect != null)
                     TextBoxOverlay(
@@ -433,11 +470,6 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> with Widget
                   ToolBar(
                     notebookId: widget.notebookId,
                     pageIndex: currentIndex,
-                    backgroundColor: _backgroundColor,
-                    onBackgroundColorChanged: (color) {
-                      setState(() => _backgroundColor = color);
-                      ref.read(noteRepositoryProvider).updateBackgroundColor(widget.notebookId, color.toARGB32());
-                    },
                   ),
                 ],
               ),

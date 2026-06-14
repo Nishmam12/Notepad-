@@ -24,20 +24,13 @@ class ActiveStrokeLayer extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     if (currentStrokePoints.isEmpty) return;
+    // The pixel eraser erases live in the combined content layer — no trail is
+    // drawn here for the eraser.
+    if (isEraser) return;
 
     final paint = Paint()
-      ..color = isEraser 
-          ? Colors.grey.withValues(alpha: 0.3) // Translucent indicator for active eraser trail
-          : strokeColor.withValues(alpha: strokeOpacity)
+      ..color = strokeColor.withValues(alpha: strokeOpacity)
       ..style = PaintingStyle.fill;
-
-    // If it's an eraser, we also draw a border to make it visible on both dark and light backgrounds
-    final borderPaint = isEraser 
-        ? (Paint()
-            ..color = Colors.white.withValues(alpha: 0.8)
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 1.5)
-        : null;
 
     final inputPoints = currentStrokePoints
         .map((p) => PointVector(p.x, p.y, p.pressure))
@@ -61,9 +54,6 @@ class ActiveStrokeLayer extends CustomPainter {
 
     final path = _buildPath(outlinePoints);
     canvas.drawPath(path, paint);
-    if (borderPaint != null) {
-      canvas.drawPath(path, borderPaint);
-    }
   }
 
   Path _buildPath(List<Offset> points) {

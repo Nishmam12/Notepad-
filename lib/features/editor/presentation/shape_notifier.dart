@@ -1,5 +1,7 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../domain/models/shape_element.dart';
+import '../domain/services/shape_hit_tester.dart';
 import '../data/repositories/shape_repository.dart';
 
 class ShapeState {
@@ -75,6 +77,25 @@ class ShapeNotifier extends StateNotifier<ShapeState> {
       newList[index] = updated;
       state = state.copyWith(shapes: newList);
     }
+  }
+
+  /// Removes any shapes within [radius] of [point] (used by the stroke eraser).
+  /// Returns the removed shapes so callers can record them for undo.
+  List<ShapeElement> eraseAtPoint(Offset point, double radius) {
+    if (!mounted) return const [];
+    final removed = <ShapeElement>[];
+    final remaining = <ShapeElement>[];
+    for (final shape in state.shapes) {
+      if (ShapeHitTester.isHit(shape, point, radius)) {
+        removed.add(shape);
+      } else {
+        remaining.add(shape);
+      }
+    }
+    if (removed.isNotEmpty) {
+      state = state.copyWith(shapes: remaining);
+    }
+    return removed;
   }
 
   void clearShapes() {

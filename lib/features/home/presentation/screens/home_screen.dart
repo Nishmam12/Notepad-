@@ -10,6 +10,7 @@ import '../../domain/models/notebook.dart';
 import 'dart:math';
 import '../../../editor/domain/models/stroke.dart';
 import '../../../editor/domain/models/stroke_point.dart';
+import '../../../editor/domain/models/template_type.dart';
 import '../../../editor/data/storage/ink_file_storage.dart';
 import '../../../editor/presentation/page_notifier.dart';
 
@@ -124,13 +125,15 @@ class HomeScreen extends ConsumerWidget {
   }
 
   Future<void> _createNotebook(BuildContext context, WidgetRef ref) async {
-    final title = await showDialog<String>(
+    final result = await showDialog<({String title, int templateIndex})>(
       context: context,
       builder: (context) => const _CreateNotebookDialog(),
     );
 
-    if (title != null && title.trim().isNotEmpty) {
-      await ref.read(homeNotifierProvider.notifier).createNotebook(title.trim());
+    if (result != null && result.title.trim().isNotEmpty) {
+      await ref.read(homeNotifierProvider.notifier).createNotebook(
+          result.title.trim(),
+          templateIndex: result.templateIndex);
     }
   }
 
@@ -151,12 +154,14 @@ class HomeScreen extends ConsumerWidget {
 
     try {
       final title = 'Perf Test ${DateTime.now().millisecondsSinceEpoch}';
-      final notebook = await ref.read(homeNotifierProvider.notifier).createNotebook(title);
+      final notebook =
+          await ref.read(homeNotifierProvider.notifier).createNotebook(title);
 
       final random = Random();
       for (int i = 0; i < 100; i++) {
         final strokes = <Stroke>[];
-        for (int s = 0; s < 50; s++) { // 50 strokes per page
+        for (int s = 0; s < 50; s++) {
+          // 50 strokes per page
           final points = <StrokePoint>[];
           for (int p = 0; p < 20; p++) {
             points.add(StrokePoint(
@@ -174,14 +179,15 @@ class HomeScreen extends ConsumerWidget {
             points: points,
           ));
         }
-        
+
         await InkFileStorage.saveStrokes(
           notebookId: notebook.id,
           pageId: i,
           strokes: strokes,
         );
-        
-        if (i > 0) { // first page is created with notebook automatically
+
+        if (i > 0) {
+          // first page is created with notebook automatically
           await ref.read(pageRepositoryProvider).createPage(notebook.id);
         }
       }
@@ -301,6 +307,7 @@ class _CreateNotebookDialog extends StatefulWidget {
 
 class _CreateNotebookDialogState extends State<_CreateNotebookDialog> {
   late final TextEditingController _controller;
+  int _selectedTemplate = 0;
 
   @override
   void initState() {
@@ -314,26 +321,96 @@ class _CreateNotebookDialogState extends State<_CreateNotebookDialog> {
     super.dispose();
   }
 
+  void _submit() {
+    Navigator.of(context).pop((
+      title: _controller.text,
+      templateIndex: _selectedTemplate,
+    ));
+  }
+
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
       backgroundColor: AppColors.surface,
       title: const Text('New Notebook'),
-      content: TextField(
-        controller: _controller,
-        autofocus: true,
-        style: const TextStyle(color: AppColors.textPrimary),
-        decoration: const InputDecoration(
-          hintText: 'Notebook title',
-          hintStyle: TextStyle(color: AppColors.textMuted),
-          enabledBorder: UnderlineInputBorder(
-            borderSide: BorderSide(color: AppColors.border),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            controller: _controller,
+            autofocus: true,
+            style: const TextStyle(color: AppColors.textPrimary),
+            decoration: const InputDecoration(
+              hintText: 'Notebook title',
+              hintStyle: TextStyle(color: AppColors.textMuted),
+              enabledBorder: UnderlineInputBorder(
+                borderSide: BorderSide(color: AppColors.border),
+              ),
+              focusedBorder: UnderlineInputBorder(
+                borderSide: BorderSide(color: AppColors.accent),
+              ),
+            ),
+            onSubmitted: (_) => _submit(),
           ),
-          focusedBorder: UnderlineInputBorder(
-            borderSide: BorderSide(color: AppColors.accent),
+          const SizedBox(height: 20),
+          const Text(
+            'Page style',
+            style: TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
           ),
-        ),
-        onSubmitted: (value) => Navigator.of(context).pop(value),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: TemplateType.values.map((type) {
+              final index = type.index;
+              final isSelected = index == _selectedTemplate;
+              return GestureDetector(
+                onTap: () => setState(() => _selectedTemplate = index),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  decoration: BoxDecoration(
+                    color:
+                        isSelected ? AppColors.accentWash : Colors.transparent,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: isSelected ? AppColors.accent : AppColors.border,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        type.iconData,
+                        size: 16,
+                        color: isSelected
+                            ? AppColors.accent
+                            : AppColors.textSecondary,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        type.displayName,
+                        style: TextStyle(
+                          color: isSelected
+                              ? AppColors.accent
+                              : AppColors.textSecondary,
+                          fontSize: 12,
+                          fontWeight:
+                              isSelected ? FontWeight.w600 : FontWeight.w400,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
       ),
       actions: [
         TextButton(
@@ -341,7 +418,7 @@ class _CreateNotebookDialogState extends State<_CreateNotebookDialog> {
           child: const Text('Cancel'),
         ),
         TextButton(
-          onPressed: () => Navigator.of(context).pop(_controller.text),
+          onPressed: _submit,
           child: const Text('Create'),
         ),
       ],

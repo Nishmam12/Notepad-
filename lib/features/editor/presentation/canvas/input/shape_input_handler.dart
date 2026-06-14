@@ -1,37 +1,36 @@
 import 'dart:math';
-import 'dart:ui' show Offset;
+import 'dart:ui' show Offset, Rect;
 import '../../../domain/models/shape_element.dart';
 import '../../../domain/models/stroke_point.dart';
 import '../../../domain/models/shape_type.dart';
 import '../../../domain/services/shape_recognizer.dart';
-import '../../../domain/services/shape_geometry.dart';
 import '../../canvas_notifier.dart';
 
 class ShapeInputHandler {
   final void Function(ShapeElement shape) onShapeRecognised;
   final void Function(List<StrokePoint> points) onShapeFallback;
   final ToolState Function() getToolState;
-  final void Function(StrokePoint)? onPreviewPointAdd;
-  final void Function()? onPreviewEnd;
+
+  /// Live preview of the shape being dragged. Called with the in-progress
+  /// shape on every move, and with `null` when the gesture ends.
+  final void Function(ShapeElement? preview)? onPreviewUpdate;
   final List<StrokePoint> _rawPoints = [];
 
   ShapeInputHandler({
     required this.onShapeRecognised,
     required this.onShapeFallback,
     required this.getToolState,
-    this.onPreviewPointAdd,
-    this.onPreviewEnd,
+    this.onPreviewUpdate,
   });
 
   void onPointerDown(StrokePoint scenePoint) {
     _rawPoints.clear();
     _rawPoints.add(scenePoint);
-    onPreviewPointAdd?.call(scenePoint);
   }
 
   void onPointerMove(StrokePoint scenePoint) {
     _rawPoints.add(scenePoint);
-    onPreviewPointAdd?.call(scenePoint);
+    _emitPreview();
   }
 
   void onPointerUp(StrokePoint scenePoint) {
@@ -39,7 +38,7 @@ class ShapeInputHandler {
     final rawOffsets = _rawPoints.map((p) => p.toOffset()).toList();
     if (rawOffsets.isEmpty) return;
 
-    onPreviewEnd?.call();
+    onPreviewUpdate?.call(null);
 
     if (toolState.selectedShapeType == ShapeType.textBox) {
       final center = rawOffsets.first;
@@ -59,34 +58,70 @@ class ShapeInputHandler {
       return;
     }
 
-    if (rawOffsets.length < 2 || ShapeGeometry.boundingRect(rawOffsets).longestSide < 5.0) {
+    if (rawOffsets.length < 2 ||
+        Rect.fromPoints(rawOffsets.first, rawOffsets.last).longestSide < 5.0) {
       onShapeFallback(List.from(_rawPoints));
       _rawPoints.clear();
       return;
     }
 
+    final geom = _buildGeometry(toolState.selectedShapeType, rawOffsets);
+    if (geom == null) {
+      onShapeFallback(List.from(_rawPoints));
+      _rawPoints.clear();
+      return;
+    }
+
+    final shape = _buildShapeElement(RecognitionResult(toolState.selectedShapeType, geom), toolState);
+    onShapeRecognised(shape);
+    _rawPoints.clear();
+  }
+
+  /// Builds and emits the live preview shape from the current drag points.
+  void _emitPreview() {
+    if (onPreviewUpdate == null) return;
+    final toolState = getToolState();
     final type = toolState.selectedShapeType;
-    final rect = ShapeGeometry.boundingRect(rawOffsets);
+    // Tap-placed shapes have no meaningful drag preview.
+    if (type == ShapeType.textBox || type == ShapeType.svgImage) return;
+
+    final rawOffsets = _rawPoints.map((p) => p.toOffset()).toList();
+    final geom = _buildGeometry(type, rawOffsets);
+    if (geom == null) {
+      onPreviewUpdate!(null);
+      return;
+    }
+    onPreviewUpdate!(_buildShapeElement(RecognitionResult(type, geom), toolState));
+  }
+
+  /// Computes geometry data for [type] from the dragged points, or null when
+  /// there aren't enough points to form a shape yet.
+  List<double>? _buildGeometry(ShapeType type, List<Offset> rawOffsets) {
+    if (rawOffsets.length < 2) return null;
+
     final first = rawOffsets.first;
     final last = rawOffsets.last;
+    // Size the shape from the start point to the current point so it can be
+    // grown AND shrunk freely mid-drag (Excalidraw-style), rather than from the
+    // bounding box of every accumulated point (which can only ever grow).
+    final rect = Rect.fromPoints(first, last);
 
-    List<double> geom;
     if (type == ShapeType.line) {
-      geom = [first.dx, first.dy, last.dx, last.dy];
+      return [first.dx, first.dy, last.dx, last.dy];
     } else if (type == ShapeType.arrow) {
       final lineVec = last - first;
       final lineAngle = atan2(lineVec.dy, lineVec.dx);
       final tip1 = last + Offset(cos(lineAngle + pi * 3 / 4), sin(lineAngle + pi * 3 / 4)) * 20;
       final tip2 = last + Offset(cos(lineAngle - pi * 3 / 4), sin(lineAngle - pi * 3 / 4)) * 20;
-      geom = [first.dx, first.dy, last.dx, last.dy, tip1.dx, tip1.dy, tip2.dx, tip2.dy];
+      return [first.dx, first.dy, last.dx, last.dy, tip1.dx, tip1.dy, tip2.dx, tip2.dy];
     } else if (type == ShapeType.circle) {
-      geom = [rect.left, rect.top, rect.right, rect.bottom];
+      return [rect.left, rect.top, rect.right, rect.bottom];
     } else if (type == ShapeType.rectangle) {
-      geom = [rect.left, rect.top, rect.right, rect.bottom];
+      return [rect.left, rect.top, rect.right, rect.bottom];
     } else if (type == ShapeType.triangle) {
-      geom = [rect.left + rect.width / 2, rect.top, rect.right, rect.bottom, rect.left, rect.bottom];
+      return [rect.left + rect.width / 2, rect.top, rect.right, rect.bottom, rect.left, rect.bottom];
     } else if (type == ShapeType.polygon) {
-      geom = [];
+      final geom = <double>[];
       final cx = rect.center.dx;
       final cy = rect.center.dy;
       final rx = rect.width / 2;
@@ -96,18 +131,14 @@ class ShapeInputHandler {
         geom.add(cx + cos(angle) * rx);
         geom.add(cy + sin(angle) * ry);
       }
+      return geom;
     } else if (type == ShapeType.diamond) {
       // Excalidraw-style 4-vertex diamond: top, right, bottom, left
       final cx = rect.center.dx;
       final cy = rect.center.dy;
-      geom = [cx, rect.top, rect.right, cy, cx, rect.bottom, rect.left, cy];
-    } else {
-      geom = [rect.left, rect.top, rect.right, rect.bottom];
+      return [cx, rect.top, rect.right, cy, cx, rect.bottom, rect.left, cy];
     }
-
-    final shape = _buildShapeElement(RecognitionResult(type, geom), toolState);
-    onShapeRecognised(shape);
-    _rawPoints.clear();
+    return [rect.left, rect.top, rect.right, rect.bottom];
   }
 
   ShapeElement _buildShapeElement(RecognitionResult result, ToolState toolState) {

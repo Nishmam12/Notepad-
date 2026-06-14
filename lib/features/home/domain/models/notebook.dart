@@ -18,4 +18,8 @@ class Notebook {
   int pageCount = 1;
 
   int backgroundColor = 0xFFFFFFFF;
+
+  /// Index into [TemplateType.values] for this notebook's paper/page style.
+  /// Defaults to 0 (TemplateType.blank).
+  int templateIndex = 0;
 }

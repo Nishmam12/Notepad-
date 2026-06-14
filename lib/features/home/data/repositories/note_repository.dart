@@ -11,12 +11,13 @@ class NoteRepository {
   NoteRepository(this._isar);
 
   /// Creates a new notebook with the given title and returns it.
-  Future<Notebook> createNotebook(String title) async {
+  Future<Notebook> createNotebook(String title, {int templateIndex = 0}) async {
     final notebook = Notebook()
       ..title = title
       ..createdAt = DateTime.now()
       ..modifiedAt = DateTime.now()
-      ..pageCount = 1;
+      ..pageCount = 1
+      ..templateIndex = templateIndex;
 
     await _isar.writeTxn(() async {
       await _isar.notebooks.put(notebook);
@@ -64,6 +65,18 @@ class NoteRepository {
     final notebook = await _isar.notebooks.get(id);
     if (notebook != null) {
       notebook.backgroundColor = color;
+      notebook.modifiedAt = DateTime.now();
+      await _isar.writeTxn(() async {
+        await _isar.notebooks.put(notebook);
+      });
+    }
+  }
+
+  /// Updates the page/paper template style of an existing notebook.
+  Future<void> updateTemplateIndex(int id, int templateIndex) async {
+    final notebook = await _isar.notebooks.get(id);
+    if (notebook != null) {
+      notebook.templateIndex = templateIndex;
       notebook.modifiedAt = DateTime.now();
       await _isar.writeTxn(() async {
         await _isar.notebooks.put(notebook);

@@ -6,13 +6,12 @@ import '../../domain/models/stroke.dart';
 import '../../domain/models/stroke_point.dart';
 import '../../domain/models/template_type.dart';
 import 'layers/background_layer.dart';
-import 'layers/stroke_history_layer.dart';
 import 'layers/active_stroke_layer.dart';
 import 'layers/imported_content_layer.dart';
 import '../imported_content_notifier.dart';
 import '../../domain/models/shape_element.dart';
 import '../selection_notifier.dart';
-import 'layers/shape_layer.dart';
+import 'layers/combined_content_layer.dart';
 import 'layers/selection_layer.dart';
 
 class CanvasWidget extends StatelessWidget {
@@ -26,6 +25,7 @@ class CanvasWidget extends StatelessWidget {
   final bool isEraser;
   final TemplateType templateType;
   final List<ShapeElement> shapes;
+  final ShapeElement? previewShape;
   final SelectionState selectionState;
   final List<Offset>? lassoPreviewPath;
   final int pageIndex;
@@ -42,6 +42,7 @@ class CanvasWidget extends StatelessWidget {
     this.backgroundColor = Colors.white,
     this.templateType = TemplateType.blank,
     this.shapes = const [],
+    this.previewShape,
     this.selectionState = const SelectionState(),
     this.lassoPreviewPath,
     required this.pageIndex,
@@ -74,20 +75,27 @@ class CanvasWidget extends StatelessWidget {
           ),
         ),
 
-        // Layer 2: Stroke History — completed strokes, cached as GPU texture.
+        // Layer 2: Combined content — completed strokes AND vector shapes inside
+        // one saveLayer, so the (pixel) eraser clears both. The live pixel-erase
+        // stroke is applied here too, which is why there is no separate trail.
         RepaintBoundary(
           child: CustomPaint(
-            painter: StrokeHistoryLayer(
+            painter: CombinedContentLayer(
               strokes: completedStrokes,
+              shapes: shapes,
+              previewShape: previewShape,
               selectionState: selectionState,
               pageIndex: pageIndex,
+              activeEraserPoints: isEraser ? currentStrokePoints : const [],
+              activeEraserSize: currentStrokeSize,
+              isErasing: isEraser,
             ),
             size: Size.infinite,
           ),
         ),
 
-        // Layer 3: Active Stroke — ONLY the live in-progress stroke.
-        // This is the only layer that repaints during input (~every 8ms).
+        // Layer 3: Active Stroke — ONLY the live in-progress pen stroke.
+        // This is the only layer that repaints during pen input (~every 8ms).
         RepaintBoundary(
           child: CustomPaint(
             painter: ActiveStrokeLayer(
@@ -101,18 +109,7 @@ class CanvasWidget extends StatelessWidget {
           ),
         ),
 
-        // Layer 4: ShapeLayer
-        RepaintBoundary(
-          child: CustomPaint(
-            painter: ShapeLayer(
-              shapes: shapes,
-              selectionState: selectionState,
-            ),
-            size: Size.infinite,
-          ),
-        ),
-
-        // Layer 5: SelectionLayer
+        // Layer 4: SelectionLayer
         RepaintBoundary(
           child: CustomPaint(
             painter: SelectionLayer(

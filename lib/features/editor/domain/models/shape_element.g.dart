@@ -221,6 +221,7 @@ const _ShapeElementtypeEnumValueMap = {
   'polygon': 5,
   'textBox': 6,
   'svgImage': 7,
+  'diamond': 8,
 };
 const _ShapeElementtypeValueEnumMap = {
   0: ShapeType.line,
@@ -231,6 +232,7 @@ const _ShapeElementtypeValueEnumMap = {
   5: ShapeType.polygon,
   6: ShapeType.textBox,
   7: ShapeType.svgImage,
+  8: ShapeType.diamond,
 };
 
 extension ShapeElementQueryFilter
