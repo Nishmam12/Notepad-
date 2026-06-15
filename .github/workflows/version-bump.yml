@@ -35,8 +35,12 @@ jobs:
       - name: Bump build number in pubspec.yaml
         run: |
           set -e
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Author the automated bump under the repo owner's identity (matching
+          # their normal commits) so github-actions[bot] doesn't appear as a
+          # contributor. The push still uses GITHUB_TOKEN, so it won't retrigger
+          # this workflow.
+          git config user.name "afnan-mojumder"
+          git config user.email "afnan.mojumder@gmail.com"
 
           current=$(grep -E '^version:' pubspec.yaml | head -n1 \
             | sed -E 's/^version:[[:space:]]*//' | tr -d '[:space:]')
