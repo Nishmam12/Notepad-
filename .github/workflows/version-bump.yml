@@ -1,0 +1,64 @@
+name: Auto version bump
+
+# Increments the +BUILD counter in pubspec.yaml on every push to main, then
+# commits the change back. This runs on GitHub's servers, so NO collaborator
+# needs any local setup — whoever pushes, the build number bumps.
+#
+# The semantic MAJOR.MINOR.PATCH is bumped by hand when a change warrants it
+# (see CHANGELOG.md); only the build counter is automated here.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+# Serialize runs on the same branch so two bumps can't race each other.
+concurrency:
+  group: version-bump-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    # Don't react to the bot's own bump commits (belt-and-suspenders: pushes
+    # made with GITHUB_TOKEN don't retrigger workflows anyway).
+    if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout latest main
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+
+      - name: Bump build number in pubspec.yaml
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          current=$(grep -E '^version:' pubspec.yaml | head -n1 \
+            | sed -E 's/^version:[[:space:]]*//' | tr -d '[:space:]')
+          semver=${current%%+*}
+          build=${current##*+}
+          case "$current" in *+*) ;; *) build=0 ;; esac
+          case "$build" in ''|*[!0-9]*) build=0 ;; esac
+          new_version="${semver}+$((build + 1))"
+
+          sed -i -E "s|^version:.*|version: ${new_version}|" pubspec.yaml
+          echo "Bumped app version to ${new_version}"
+
+          git add pubspec.yaml
+          git commit -m "ci: bump version to ${new_version} [skip ci]"
+
+          # Retry to survive a human push landing between checkout and push.
+          for attempt in 1 2 3; do
+            if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+              exit 0
+            fi
+            echo "Push rejected; rebasing onto latest and retrying ($attempt)…"
+            git pull --rebase --autostash origin "${GITHUB_REF_NAME}"
+          done
+          echo "Failed to push version bump after 3 attempts" >&2
+          exit 1

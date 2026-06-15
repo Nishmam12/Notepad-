@@ -1,8 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../../../../core/constants/app_colors.dart';
 
-class AboutScreen extends StatelessWidget {
+class AboutScreen extends StatefulWidget {
   const AboutScreen({super.key});
+
+  @override
+  State<AboutScreen> createState() => _AboutScreenState();
+}
+
+class _AboutScreenState extends State<AboutScreen> {
+  // Reads the version/build embedded from pubspec.yaml at build time, so this
+  // always reflects the build actually installed on the device.
+  final Future<PackageInfo> _packageInfo = PackageInfo.fromPlatform();
 
   @override
   Widget build(BuildContext context) {
@@ -53,12 +63,21 @@ class AboutScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
-              'Version 1.0.0',
-              style: TextStyle(
-                fontSize: 16,
-                color: AppColors.textSecondary,
-              ),
+            FutureBuilder<PackageInfo>(
+              future: _packageInfo,
+              builder: (context, snapshot) {
+                final info = snapshot.data;
+                final label = info == null
+                    ? 'Version …'
+                    : 'Version ${info.version} (build ${info.buildNumber})';
+                return Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    color: AppColors.textSecondary,
+                  ),
+                );
+              },
             ),
             const SizedBox(height: 32),
             const Padding(
@@ -75,11 +94,13 @@ class AboutScreen extends StatelessWidget {
             ),
             const SizedBox(height: 48),
             TextButton(
-              onPressed: () {
+              onPressed: () async {
+                final info = await _packageInfo;
+                if (!context.mounted) return;
                 showLicensePage(
                   context: context,
                   applicationName: 'InkFlow',
-                  applicationVersion: '1.0.0',
+                  applicationVersion: info.version,
                 );
               },
               child: const Text('View Open Source Licenses'),
