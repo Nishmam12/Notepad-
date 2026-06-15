@@ -14,6 +14,16 @@ Versioning: `MAJOR.MINOR.PATCH+BUILD`
   Entries below are keyed by the semantic version; the exact `+BUILD` you see
   in-app is whatever commit you're on.
 
+## [1.0.2] - 2026-06-16
+### Fixed
+- Palm rejection is now order-independent and far more consistent. Previously a
+  touch was only ignored if the stylus was already down when it landed, so a
+  palm resting *before* the pen (or lingering between strokes) slipped through
+  and caused stray marks or unwanted pan/zoom. Now the pen retroactively drops
+  any palm already on screen, a short grace window after each stroke ignores a
+  settling/re-tapping palm, and a hovering stylus pre-arms rejection. Finger
+  drawing and two-finger pan/zoom are unaffected when no stylus is in use.
+
 ## [1.0.1] - 2026-06-16
 ### Added
 - Single-source version tracking: the app version now lives only in
