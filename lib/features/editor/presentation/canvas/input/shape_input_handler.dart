@@ -4,6 +4,7 @@ import '../../../domain/models/shape_element.dart';
 import '../../../domain/models/stroke_point.dart';
 import '../../../domain/models/shape_type.dart';
 import '../../../domain/services/shape_recognizer.dart';
+import '../../../domain/services/binding_service.dart';
 import '../../canvas_notifier.dart';
 
 class ShapeInputHandler {
@@ -14,6 +15,10 @@ class ShapeInputHandler {
   /// Live preview of the shape being dragged. Called with the in-progress
   /// shape on every move, and with `null` when the gesture ends.
   final void Function(ShapeElement? preview)? onPreviewUpdate;
+
+  /// Current page shapes, used to bind arrow endpoints on creation.
+  final List<ShapeElement> Function()? getCurrentShapes;
+
   final List<StrokePoint> _rawPoints = [];
 
   ShapeInputHandler({
@@ -21,6 +26,7 @@ class ShapeInputHandler {
     required this.onShapeFallback,
     required this.getToolState,
     this.onPreviewUpdate,
+    this.getCurrentShapes,
   });
 
   void onPointerDown(StrokePoint scenePoint) {
@@ -73,7 +79,11 @@ class ShapeInputHandler {
     }
 
     final shape = _buildShapeElement(RecognitionResult(toolState.selectedShapeType, geom), toolState);
-    onShapeRecognised(shape);
+    // Bind arrow endpoints to any shape they land on so they follow it.
+    final result = shape.type == ShapeType.arrow
+        ? BindingService.bindNewArrow(shape, getCurrentShapes?.call() ?? const [])
+        : shape;
+    onShapeRecognised(result);
     _rawPoints.clear();
   }
 
@@ -160,6 +170,8 @@ class ShapeInputHandler {
       ..isItalic = false
       ..svgRelativePath = ''
       ..zOrder = DateTime.now().millisecondsSinceEpoch
+      ..seed = Random().nextInt(1 << 31)
+      ..roughness = toolState.sketchyShapes ? 1.0 : 0.0
       ..geometryData = result.geometryData;
   }
 }

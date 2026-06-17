@@ -32,18 +32,39 @@ class LassoInputHandler {
     onLassoUpdate(List.from(_lassoPath));
   }
 
+  // A gesture whose bounding box stays under this many scene px is treated as a
+  // tap (select the single topmost element) rather than a lasso.
+  static const double _tapSpreadThreshold = 10.0;
+  // Hit slop for tap-to-select, in scene px.
+  static const double _tapTolerance = 12.0;
+
   void onPointerUp(Offset sceneOffset) async {
-    if (_lassoPath.length < 3) {
-      _lassoPath.clear();
-      onLassoUpdate([]);
-      return;
-    }
+    final path = List<Offset>.from(_lassoPath);
+    _lassoPath.clear();
+    onLassoUpdate([]);
 
     final currentStrokes = getCurrentStrokes();
     final currentShapes = getCurrentShapes();
 
+    // Tap-to-select: a near-stationary gesture selects the topmost element under
+    // the point (or clears the selection when tapping empty space).
+    final spread =
+        path.isEmpty ? 0.0 : ShapeGeometry.boundingRect(path).longestSide;
+    if (path.length < 3 || spread < _tapSpreadThreshold) {
+      final point = path.isNotEmpty ? path.first : sceneOffset;
+      final result =
+          hitTopmost(point, currentStrokes, currentShapes, _tapTolerance);
+      if (!result.isEmpty) {
+        onLassoComplete(
+            result, _computeSelectionBounds(result, currentStrokes, currentShapes));
+      } else {
+        onLassoComplete(const LassoHitResult({}, {}), Rect.zero);
+      }
+      return;
+    }
+
     final input = LassoHitTestInput(
-      lassoPath: List.from(_lassoPath),
+      lassoPath: path,
       strokes: currentStrokes,
       shapes: currentShapes,
     );
@@ -56,9 +77,6 @@ class LassoInputHandler {
     } else {
       onLassoComplete(result, Rect.zero);
     }
-
-    _lassoPath.clear();
-    onLassoUpdate([]);
   }
 
   Rect _computeSelectionBounds(LassoHitResult result, List<Stroke> strokes, List<ShapeElement> shapes) {

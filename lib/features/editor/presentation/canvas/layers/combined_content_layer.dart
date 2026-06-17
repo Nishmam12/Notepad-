@@ -18,11 +18,17 @@ import '../../../domain/models/shape_element.dart';
 import '../../../domain/models/shape_type.dart';
 import '../../../domain/services/shape_geometry.dart';
 import '../../selection_notifier.dart';
+import '../rough_renderer.dart';
 
 /// Caches generated freehand paths per Stroke object. A stroke moved/scaled is a
 /// new object (via copyWith), so it misses the cache and recomputes at its new
 /// geometry; superseded strokes are GC'd along with their cached path.
 final Expando<Path> _strokePathCache = Expando<Path>();
+
+/// Caches the perturbed "rough" outline per ShapeElement object, so the sketchy
+/// look is generated once and stays stable across repaints. A mutated shape is a
+/// new object (via copyWith) and regenerates at its new geometry.
+final Expando<Path> _roughPathCache = Expando<Path>();
 
 /// Cached base picture (all unselected strokes + shapes, in chronological order).
 /// Rebuilt only when the content set or selection changes — so a live pixel-erase
@@ -34,6 +40,8 @@ class CombinedContentCache {
   static List<ShapeElement>? shapes;
   static Set<String> selectedStrokeIds = const {};
   static Set<String> selectedShapeIds = const {};
+  static Set<String> pendingEraseStrokeIds = const {};
+  static Set<String> pendingEraseShapeIds = const {};
 
   static void invalidate() {
     picture?.dispose();
@@ -56,6 +64,11 @@ class CombinedContentLayer extends CustomPainter {
   final double activeEraserSize;
   final bool isErasing;
 
+  // Stroke-eraser: ids marked for erasure during the current drag, drawn dimmed
+  // until the gesture commits.
+  final Set<String> pendingEraseStrokeIds;
+  final Set<String> pendingEraseShapeIds;
+
   const CombinedContentLayer({
     required this.strokes,
     required this.shapes,
@@ -65,6 +78,8 @@ class CombinedContentLayer extends CustomPainter {
     this.activeEraserPoints = const [],
     this.activeEraserSize = 4.0,
     this.isErasing = false,
+    this.pendingEraseStrokeIds = const {},
+    this.pendingEraseShapeIds = const {},
   });
 
   @override
@@ -95,6 +110,10 @@ class CombinedContentLayer extends CustomPainter {
       _drawShape(canvas, previewShape!);
     }
 
+    // Strokes/shapes pending erasure are excluded from the cached base and
+    // redrawn here at low opacity, previewing what the gesture will delete.
+    _drawPendingErase(canvas, size);
+
     // Selected strokes/shapes are excluded from the cached base and drawn here
     // with the live transform applied, so they move/scale smoothly.
     _drawSelectedTransformed(canvas);
@@ -111,7 +130,11 @@ class CombinedContentLayer extends CustomPainter {
         !identical(CombinedContentCache.strokes, strokes) ||
         !identical(CombinedContentCache.shapes, shapes) ||
         !setEquals(CombinedContentCache.selectedStrokeIds, selStrokes) ||
-        !setEquals(CombinedContentCache.selectedShapeIds, selShapes);
+        !setEquals(CombinedContentCache.selectedShapeIds, selShapes) ||
+        !setEquals(
+            CombinedContentCache.pendingEraseStrokeIds, pendingEraseStrokeIds) ||
+        !setEquals(
+            CombinedContentCache.pendingEraseShapeIds, pendingEraseShapeIds);
 
     if (!needsRebuild) return;
 
@@ -134,6 +157,8 @@ class CombinedContentLayer extends CustomPainter {
     CombinedContentCache.shapes = shapes;
     CombinedContentCache.selectedStrokeIds = selStrokes;
     CombinedContentCache.selectedShapeIds = selShapes;
+    CombinedContentCache.pendingEraseStrokeIds = pendingEraseStrokeIds;
+    CombinedContentCache.pendingEraseShapeIds = pendingEraseShapeIds;
   }
 
   /// Merges unselected strokes and shapes into a single list ordered by creation
@@ -143,11 +168,15 @@ class CombinedContentLayer extends CustomPainter {
     final items = <_Drawable>[];
     int seq = 0;
     for (final s in strokes) {
-      if (selStrokes.contains(s.id)) continue;
+      if (selStrokes.contains(s.id) || pendingEraseStrokeIds.contains(s.id)) {
+        continue;
+      }
       items.add(_Drawable(int.tryParse(s.id) ?? 0, seq++, stroke: s));
     }
     for (final sh in shapes) {
-      if (selShapes.contains(sh.id)) continue;
+      if (selShapes.contains(sh.id) || pendingEraseShapeIds.contains(sh.id)) {
+        continue;
+      }
       // zOrder is in milliseconds; strokes use microseconds — normalise to µs.
       items.add(_Drawable(sh.zOrder * 1000, seq++, shape: sh));
     }
@@ -164,18 +193,26 @@ class CombinedContentLayer extends CustomPainter {
     if (selStrokes.isEmpty && selShapes.isEmpty) return;
 
     final transforming = selectionState.isTransforming;
+    final rotationCenter = selectionState.rotationCenter;
+    final scaleAnchor = selectionState.scaleAnchor;
 
+    // Geometry is transformed in the order: scale (about the anchor) → rotate
+    // (about the centre) → translate, matching LassoTransformCommand. Canvas
+    // applies the *last* pushed matrix first, so they are pushed in reverse.
     void withTransform(VoidCallback draw) {
       if (transforming) {
         canvas.save();
         canvas.translate(selectionState.currentTranslation.dx,
             selectionState.currentTranslation.dy);
-        if (selectionState.currentScale != 1.0 &&
-            selectionState.selectionBounds != null) {
-          final center = selectionState.selectionBounds!.center;
-          canvas.translate(center.dx, center.dy);
+        if (selectionState.currentRotation != 0.0 && rotationCenter != null) {
+          canvas.translate(rotationCenter.dx, rotationCenter.dy);
+          canvas.rotate(selectionState.currentRotation);
+          canvas.translate(-rotationCenter.dx, -rotationCenter.dy);
+        }
+        if (selectionState.currentScale != 1.0 && scaleAnchor != null) {
+          canvas.translate(scaleAnchor.dx, scaleAnchor.dy);
           canvas.scale(selectionState.currentScale);
-          canvas.translate(-center.dx, -center.dy);
+          canvas.translate(-scaleAnchor.dx, -scaleAnchor.dy);
         }
       }
       draw();
@@ -192,6 +229,23 @@ class CombinedContentLayer extends CustomPainter {
         withTransform(() => _drawShape(canvas, sh));
       }
     }
+  }
+
+  void _drawPendingErase(Canvas canvas, Size size) {
+    if (pendingEraseStrokeIds.isEmpty && pendingEraseShapeIds.isEmpty) return;
+
+    // saveLayer with a translucent paint dims everything drawn inside it.
+    canvas.saveLayer(
+      Rect.fromLTWH(0, 0, size.width, size.height),
+      Paint()..color = const Color.fromRGBO(0, 0, 0, 0.25),
+    );
+    for (final s in strokes) {
+      if (pendingEraseStrokeIds.contains(s.id)) _drawStroke(canvas, s);
+    }
+    for (final sh in shapes) {
+      if (pendingEraseShapeIds.contains(sh.id)) _drawShape(canvas, sh);
+    }
+    canvas.restore();
   }
 
   // ---- Stroke rendering -----------------------------------------------------
@@ -279,6 +333,12 @@ class CombinedContentLayer extends CustomPainter {
           .withValues(alpha: shape.hasFill ? shape.opacity : 0)
       ..style = PaintingStyle.fill;
 
+    if (shape.roughness > 0 && _isRoughable(shape.type)) {
+      _drawRoughShape(canvas, shape, strokePaint, fillPaint);
+      canvas.restore();
+      return;
+    }
+
     switch (shape.type) {
       case ShapeType.line:
         final (start, end) = ShapeGeometry.lineFromGeometry(shape.geometryData);
@@ -336,6 +396,78 @@ class CombinedContentLayer extends CustomPainter {
     canvas.restore();
   }
 
+  bool _isRoughable(ShapeType t) =>
+      t == ShapeType.line ||
+      t == ShapeType.arrow ||
+      t == ShapeType.circle ||
+      t == ShapeType.rectangle ||
+      t == ShapeType.triangle ||
+      t == ShapeType.polygon ||
+      t == ShapeType.diamond;
+
+  void _drawRoughShape(
+      Canvas canvas, ShapeElement shape, Paint strokePaint, Paint fillPaint) {
+    if (shape.type == ShapeType.line) {
+      final (s, e) = ShapeGeometry.lineFromGeometry(shape.geometryData);
+      canvas.drawPath(_roughOutline(shape, [s, e], false), strokePaint);
+      return;
+    }
+    if (shape.type == ShapeType.arrow) {
+      final start = Offset(shape.geometryData[0], shape.geometryData[1]);
+      final end = Offset(shape.geometryData[2], shape.geometryData[3]);
+      canvas.drawPath(_roughOutline(shape, [start, end], false), strokePaint);
+      if (shape.geometryData.length >= 8) {
+        final arrowPath = Path()
+          ..moveTo(shape.geometryData[4], shape.geometryData[5])
+          ..lineTo(end.dx, end.dy)
+          ..lineTo(shape.geometryData[6], shape.geometryData[7]);
+        canvas.drawPath(arrowPath, strokePaint);
+      }
+      return;
+    }
+
+    // Closed area shapes: hachure fill (when filled) + rough outline.
+    final List<Offset> pts;
+    final Path fillPath;
+    final Rect bounds;
+    if (shape.type == ShapeType.circle) {
+      final rect = ShapeGeometry.rectFromGeometry(shape.geometryData);
+      pts = RoughRenderer.ellipsePolygon(rect);
+      fillPath = Path()..addOval(rect);
+      bounds = rect;
+    } else if (shape.type == ShapeType.rectangle) {
+      final rect = ShapeGeometry.rectFromGeometry(shape.geometryData);
+      pts = [rect.topLeft, rect.topRight, rect.bottomRight, rect.bottomLeft];
+      fillPath = Path()..addRect(rect);
+      bounds = rect;
+    } else {
+      pts = ShapeGeometry.verticesFromGeometry(shape.geometryData);
+      fillPath = Path()..addPolygon(pts, true);
+      bounds = ShapeGeometry.boundingRect(pts);
+    }
+    if (pts.isEmpty) return;
+
+    if (shape.hasFill) {
+      final hachurePaint = Paint()
+        ..color = Color(shape.fillColor).withValues(alpha: shape.opacity)
+        ..strokeWidth = (shape.strokeWidth * 0.5).clamp(0.6, 2.5)
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round;
+      RoughRenderer.hachure(canvas, fillPath, bounds, shape.seed, hachurePaint,
+          gap: (shape.strokeWidth * 3).clamp(7.0, 16.0));
+    }
+
+    canvas.drawPath(_roughOutline(shape, pts, true), strokePaint);
+  }
+
+  Path _roughOutline(ShapeElement shape, List<Offset> pts, bool closed) {
+    final cached = _roughPathCache[shape];
+    if (cached != null) return cached;
+    final p = RoughRenderer.outline(pts, closed, shape.seed, shape.roughness);
+    _roughPathCache[shape] = p;
+    return p;
+  }
+
   void _drawTextBox(Canvas canvas, ShapeElement shape) {
     final rect = ShapeGeometry.rectFromGeometry(shape.geometryData);
     final builder = ui.ParagraphBuilder(
@@ -385,7 +517,9 @@ class CombinedContentLayer extends CustomPainter {
       pageIndex != oldDelegate.pageIndex ||
       isErasing != oldDelegate.isErasing ||
       activeEraserPoints != oldDelegate.activeEraserPoints ||
-      activeEraserSize != oldDelegate.activeEraserSize;
+      activeEraserSize != oldDelegate.activeEraserSize ||
+      !setEquals(pendingEraseStrokeIds, oldDelegate.pendingEraseStrokeIds) ||
+      !setEquals(pendingEraseShapeIds, oldDelegate.pendingEraseShapeIds);
 }
 
 class _Drawable {

@@ -49,11 +49,41 @@ class ShapeToolbar extends ConsumerWidget {
                     _buildShapeBtn(ref, toolState, ShapeType.textBox, Icons.title),
                     // SVGs are imported via bottom sheet, but we can have an icon here as well or omit. The prompt says: "8 icons for line, arrow, circle, rectangle, triangle, polygon, textBox, SVG".
                     _buildShapeBtn(ref, toolState, ShapeType.svgImage, Icons.image_outlined),
+                    Container(
+                      width: 1,
+                      height: 24,
+                      margin: const EdgeInsets.symmetric(horizontal: 6),
+                      color: AppColors.border,
+                    ),
+                    _buildSketchyToggle(ref, toolState),
                   ],
                 ),
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSketchyToggle(WidgetRef ref, ToolState toolState) {
+    final isOn = toolState.sketchyShapes;
+    return GestureDetector(
+      onTap: () => ref.read(toolProvider.notifier).toggleSketchyShapes(),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 4),
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: isOn ? AppColors.accentWash : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isOn ? AppColors.accent : Colors.transparent,
+          ),
+        ),
+        child: Icon(
+          Icons.gesture,
+          color: isOn ? AppColors.accent : AppColors.textSecondary,
+          size: 20,
         ),
       ),
     );

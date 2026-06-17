@@ -54,6 +54,9 @@ class ToolState {
   final ToolType activeTool;
   final ShapeType selectedShapeType;
 
+  /// When true, new shapes are drawn with a hand-drawn ("rough") look.
+  final bool sketchyShapes;
+
   const ToolState({
     this.color = Colors.black,
     this.size = 4.0,
@@ -63,6 +66,7 @@ class ToolState {
     this.template = TemplateType.blank,
     this.activeTool = ToolType.pen,
     this.selectedShapeType = ShapeType.line,
+    this.sketchyShapes = false,
   });
 
   factory ToolState.initial() => const ToolState();
@@ -76,6 +80,7 @@ class ToolState {
     TemplateType? template,
     ToolType? activeTool,
     ShapeType? selectedShapeType,
+    bool? sketchyShapes,
   }) {
     return ToolState(
       color: color ?? this.color,
@@ -86,6 +91,7 @@ class ToolState {
       template: template ?? this.template,
       activeTool: activeTool ?? this.activeTool,
       selectedShapeType: selectedShapeType ?? this.selectedShapeType,
+      sketchyShapes: sketchyShapes ?? this.sketchyShapes,
     );
   }
 }
@@ -246,6 +252,7 @@ class ToolNotifier extends StateNotifier<ToolState> {
   void setLassoTool() => state = state.copyWith(isEraser: false, activeTool: ToolType.lasso);
   void setHandTool() => state = state.copyWith(isEraser: false, activeTool: ToolType.hand);
   void setShapeType(ShapeType type) => state = state.copyWith(selectedShapeType: type);
+  void toggleSketchyShapes() => state = state.copyWith(sketchyShapes: !state.sketchyShapes);
   void setTemplate(TemplateType template) =>
       state = state.copyWith(template: template);
 }

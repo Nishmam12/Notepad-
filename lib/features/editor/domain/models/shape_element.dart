@@ -44,6 +44,21 @@ class ShapeElement {
   // Ordering
   late int zOrder;
 
+  // Stable random seed for the hand-drawn ("rough") renderer, so the sketchy
+  // perturbation is identical on every repaint. Defaults to 0 for shapes
+  // created before this field existed.
+  int seed = 0;
+
+  // Arrow binding (type == arrow only): the id of the shape each endpoint is
+  // bound to, or '' when unbound. A bound endpoint re-anchors to the shape's
+  // edge when that shape moves/resizes/rotates.
+  String startBindingId = '';
+  String endBindingId = '';
+
+  // Hand-drawn ("rough") rendering amount. 0 = clean geometric (default, so
+  // shapes created before this field stay crisp); > 0 = sketchy.
+  double roughness = 0.0;
+
   ShapeElement();
 
   factory ShapeElement.line({required String id, required Offset start,
@@ -126,5 +141,51 @@ class ShapeElement {
       ..fontFamily = 'Roboto' ..isBold = false ..isItalic = false
       ..svgRelativePath = svgRelativePath ..zOrder = 0
       ..geometryData = [rect.left, rect.top, rect.right, rect.bottom];
+  }
+
+  /// Returns a deep copy with selected fields overridden. Preserves all fields
+  /// (including [seed] and bindings) so reconstructing a shape never silently
+  /// drops them.
+  ShapeElement copyWith({
+    int? color,
+    double? strokeWidth,
+    bool? hasFill,
+    int? fillColor,
+    double? opacity,
+    List<double>? geometryData,
+    double? rotation,
+    String? text,
+    double? fontSize,
+    String? fontFamily,
+    bool? isBold,
+    bool? isItalic,
+    String? svgRelativePath,
+    int? zOrder,
+    int? seed,
+    String? startBindingId,
+    String? endBindingId,
+    double? roughness,
+  }) {
+    return ShapeElement()
+      ..id = id
+      ..type = type
+      ..color = color ?? this.color
+      ..strokeWidth = strokeWidth ?? this.strokeWidth
+      ..hasFill = hasFill ?? this.hasFill
+      ..fillColor = fillColor ?? this.fillColor
+      ..opacity = opacity ?? this.opacity
+      ..geometryData = geometryData ?? List<double>.from(this.geometryData)
+      ..rotation = rotation ?? this.rotation
+      ..text = text ?? this.text
+      ..fontSize = fontSize ?? this.fontSize
+      ..fontFamily = fontFamily ?? this.fontFamily
+      ..isBold = isBold ?? this.isBold
+      ..isItalic = isItalic ?? this.isItalic
+      ..svgRelativePath = svgRelativePath ?? this.svgRelativePath
+      ..zOrder = zOrder ?? this.zOrder
+      ..seed = seed ?? this.seed
+      ..startBindingId = startBindingId ?? this.startBindingId
+      ..endBindingId = endBindingId ?? this.endBindingId
+      ..roughness = roughness ?? this.roughness;
   }
 }

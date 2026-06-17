@@ -13,6 +13,7 @@ import '../../domain/models/shape_element.dart';
 import '../selection_notifier.dart';
 import 'layers/combined_content_layer.dart';
 import 'layers/selection_layer.dart';
+import 'layers/eraser_trail_layer.dart';
 
 class CanvasWidget extends StatelessWidget {
   final List<Stroke> completedStrokes;
@@ -29,6 +30,9 @@ class CanvasWidget extends StatelessWidget {
   final SelectionState selectionState;
   final List<Offset>? lassoPreviewPath;
   final int pageIndex;
+  final Set<String> pendingEraseStrokeIds;
+  final Set<String> pendingEraseShapeIds;
+  final bool showEraserTrail;
 
   const CanvasWidget({
     super.key,
@@ -46,6 +50,9 @@ class CanvasWidget extends StatelessWidget {
     this.selectionState = const SelectionState(),
     this.lassoPreviewPath,
     required this.pageIndex,
+    this.pendingEraseStrokeIds = const {},
+    this.pendingEraseShapeIds = const {},
+    this.showEraserTrail = false,
   });
 
   @override
@@ -89,6 +96,8 @@ class CanvasWidget extends StatelessWidget {
               activeEraserPoints: isEraser ? currentStrokePoints : const [],
               activeEraserSize: currentStrokeSize,
               isErasing: isEraser,
+              pendingEraseStrokeIds: pendingEraseStrokeIds,
+              pendingEraseShapeIds: pendingEraseShapeIds,
             ),
             size: Size.infinite,
           ),
@@ -119,6 +128,10 @@ class CanvasWidget extends StatelessWidget {
             size: Size.infinite,
           ),
         ),
+
+        // Layer 5: animated eraser trail (only while the stroke eraser is used).
+        if (showEraserTrail)
+          const RepaintBoundary(child: EraserTrailLayer()),
       ],
     );
   }

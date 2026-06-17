@@ -24,6 +24,56 @@ class ShapeHitTester {
     return false;
   }
 
+  /// Segment variant of [isHit]: true when the eraser segment [a]→[b] passes
+  /// within [radius] of the shape outline, or either endpoint is inside an
+  /// area-type shape. Testing a segment (rather than a single point) makes the
+  /// eraser speed-independent — a fast swipe that lands few sample points still
+  /// catches every shape it crossed.
+  static bool isHitBySegment(
+      ShapeElement shape, Offset a, Offset b, double radius) {
+    final la = _toLocal(shape, a);
+    final lb = _toLocal(shape, b);
+    final r2 = radius * radius;
+
+    for (final (s0, s1) in _outlineSegments(shape)) {
+      if (segmentSegmentDistanceSq(la, lb, s0, s1) <= r2) return true;
+    }
+
+    if (_isAreaShape(shape) &&
+        (_containsLocal(shape, la) || _containsLocal(shape, lb))) {
+      return true;
+    }
+
+    return false;
+  }
+
+  /// Squared shortest distance between segments [p1]→[p2] and [p3]→[p4].
+  static double segmentSegmentDistanceSq(
+      Offset p1, Offset p2, Offset p3, Offset p4) {
+    if (_segmentsIntersect(p1, p2, p3, p4)) return 0.0;
+    return [
+      _distanceSqToSegment(p1, p3, p4),
+      _distanceSqToSegment(p2, p3, p4),
+      _distanceSqToSegment(p3, p1, p2),
+      _distanceSqToSegment(p4, p1, p2),
+    ].reduce((m, e) => e < m ? e : m);
+  }
+
+  static double _cross(Offset o, Offset a, Offset b) =>
+      (a.dx - o.dx) * (b.dy - o.dy) - (a.dy - o.dy) * (b.dx - o.dx);
+
+  static bool _segmentsIntersect(Offset p1, Offset p2, Offset p3, Offset p4) {
+    final d1 = _cross(p3, p4, p1);
+    final d2 = _cross(p3, p4, p2);
+    final d3 = _cross(p1, p2, p3);
+    final d4 = _cross(p1, p2, p4);
+    if (((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) &&
+        ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))) {
+      return true;
+    }
+    return false;
+  }
+
   static bool _isAreaShape(ShapeElement shape) {
     return shape.type == ShapeType.textBox ||
         shape.type == ShapeType.svgImage ||

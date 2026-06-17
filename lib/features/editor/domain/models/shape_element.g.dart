@@ -18,79 +18,99 @@ const ShapeElementSchema = Schema(
       name: r'color',
       type: IsarType.long,
     ),
-    r'fillColor': PropertySchema(
+    r'endBindingId': PropertySchema(
       id: 1,
+      name: r'endBindingId',
+      type: IsarType.string,
+    ),
+    r'fillColor': PropertySchema(
+      id: 2,
       name: r'fillColor',
       type: IsarType.long,
     ),
     r'fontFamily': PropertySchema(
-      id: 2,
+      id: 3,
       name: r'fontFamily',
       type: IsarType.string,
     ),
     r'fontSize': PropertySchema(
-      id: 3,
+      id: 4,
       name: r'fontSize',
       type: IsarType.double,
     ),
     r'geometryData': PropertySchema(
-      id: 4,
+      id: 5,
       name: r'geometryData',
       type: IsarType.doubleList,
     ),
     r'hasFill': PropertySchema(
-      id: 5,
+      id: 6,
       name: r'hasFill',
       type: IsarType.bool,
     ),
     r'id': PropertySchema(
-      id: 6,
+      id: 7,
       name: r'id',
       type: IsarType.string,
     ),
     r'isBold': PropertySchema(
-      id: 7,
+      id: 8,
       name: r'isBold',
       type: IsarType.bool,
     ),
     r'isItalic': PropertySchema(
-      id: 8,
+      id: 9,
       name: r'isItalic',
       type: IsarType.bool,
     ),
     r'opacity': PropertySchema(
-      id: 9,
+      id: 10,
       name: r'opacity',
       type: IsarType.double,
     ),
     r'rotation': PropertySchema(
-      id: 10,
+      id: 11,
       name: r'rotation',
       type: IsarType.double,
     ),
+    r'roughness': PropertySchema(
+      id: 12,
+      name: r'roughness',
+      type: IsarType.double,
+    ),
+    r'seed': PropertySchema(
+      id: 13,
+      name: r'seed',
+      type: IsarType.long,
+    ),
+    r'startBindingId': PropertySchema(
+      id: 14,
+      name: r'startBindingId',
+      type: IsarType.string,
+    ),
     r'strokeWidth': PropertySchema(
-      id: 11,
+      id: 15,
       name: r'strokeWidth',
       type: IsarType.double,
     ),
     r'svgRelativePath': PropertySchema(
-      id: 12,
+      id: 16,
       name: r'svgRelativePath',
       type: IsarType.string,
     ),
     r'text': PropertySchema(
-      id: 13,
+      id: 17,
       name: r'text',
       type: IsarType.string,
     ),
     r'type': PropertySchema(
-      id: 14,
+      id: 18,
       name: r'type',
       type: IsarType.byte,
       enumMap: _ShapeElementtypeEnumValueMap,
     ),
     r'zOrder': PropertySchema(
-      id: 15,
+      id: 19,
       name: r'zOrder',
       type: IsarType.long,
     )
@@ -107,9 +127,11 @@ int _shapeElementEstimateSize(
   Map<Type, List<int>> allOffsets,
 ) {
   var bytesCount = offsets.last;
+  bytesCount += 3 + object.endBindingId.length * 3;
   bytesCount += 3 + object.fontFamily.length * 3;
   bytesCount += 3 + object.geometryData.length * 8;
   bytesCount += 3 + object.id.length * 3;
+  bytesCount += 3 + object.startBindingId.length * 3;
   bytesCount += 3 + object.svgRelativePath.length * 3;
   bytesCount += 3 + object.text.length * 3;
   return bytesCount;
@@ -122,21 +144,25 @@ void _shapeElementSerialize(
   Map<Type, List<int>> allOffsets,
 ) {
   writer.writeLong(offsets[0], object.color);
-  writer.writeLong(offsets[1], object.fillColor);
-  writer.writeString(offsets[2], object.fontFamily);
-  writer.writeDouble(offsets[3], object.fontSize);
-  writer.writeDoubleList(offsets[4], object.geometryData);
-  writer.writeBool(offsets[5], object.hasFill);
-  writer.writeString(offsets[6], object.id);
-  writer.writeBool(offsets[7], object.isBold);
-  writer.writeBool(offsets[8], object.isItalic);
-  writer.writeDouble(offsets[9], object.opacity);
-  writer.writeDouble(offsets[10], object.rotation);
-  writer.writeDouble(offsets[11], object.strokeWidth);
-  writer.writeString(offsets[12], object.svgRelativePath);
-  writer.writeString(offsets[13], object.text);
-  writer.writeByte(offsets[14], object.type.index);
-  writer.writeLong(offsets[15], object.zOrder);
+  writer.writeString(offsets[1], object.endBindingId);
+  writer.writeLong(offsets[2], object.fillColor);
+  writer.writeString(offsets[3], object.fontFamily);
+  writer.writeDouble(offsets[4], object.fontSize);
+  writer.writeDoubleList(offsets[5], object.geometryData);
+  writer.writeBool(offsets[6], object.hasFill);
+  writer.writeString(offsets[7], object.id);
+  writer.writeBool(offsets[8], object.isBold);
+  writer.writeBool(offsets[9], object.isItalic);
+  writer.writeDouble(offsets[10], object.opacity);
+  writer.writeDouble(offsets[11], object.rotation);
+  writer.writeDouble(offsets[12], object.roughness);
+  writer.writeLong(offsets[13], object.seed);
+  writer.writeString(offsets[14], object.startBindingId);
+  writer.writeDouble(offsets[15], object.strokeWidth);
+  writer.writeString(offsets[16], object.svgRelativePath);
+  writer.writeString(offsets[17], object.text);
+  writer.writeByte(offsets[18], object.type.index);
+  writer.writeLong(offsets[19], object.zOrder);
 }
 
 ShapeElement _shapeElementDeserialize(
@@ -147,23 +173,27 @@ ShapeElement _shapeElementDeserialize(
 ) {
   final object = ShapeElement();
   object.color = reader.readLong(offsets[0]);
-  object.fillColor = reader.readLong(offsets[1]);
-  object.fontFamily = reader.readString(offsets[2]);
-  object.fontSize = reader.readDouble(offsets[3]);
-  object.geometryData = reader.readDoubleList(offsets[4]) ?? [];
-  object.hasFill = reader.readBool(offsets[5]);
-  object.id = reader.readString(offsets[6]);
-  object.isBold = reader.readBool(offsets[7]);
-  object.isItalic = reader.readBool(offsets[8]);
-  object.opacity = reader.readDouble(offsets[9]);
-  object.rotation = reader.readDouble(offsets[10]);
-  object.strokeWidth = reader.readDouble(offsets[11]);
-  object.svgRelativePath = reader.readString(offsets[12]);
-  object.text = reader.readString(offsets[13]);
+  object.endBindingId = reader.readString(offsets[1]);
+  object.fillColor = reader.readLong(offsets[2]);
+  object.fontFamily = reader.readString(offsets[3]);
+  object.fontSize = reader.readDouble(offsets[4]);
+  object.geometryData = reader.readDoubleList(offsets[5]) ?? [];
+  object.hasFill = reader.readBool(offsets[6]);
+  object.id = reader.readString(offsets[7]);
+  object.isBold = reader.readBool(offsets[8]);
+  object.isItalic = reader.readBool(offsets[9]);
+  object.opacity = reader.readDouble(offsets[10]);
+  object.rotation = reader.readDouble(offsets[11]);
+  object.roughness = reader.readDouble(offsets[12]);
+  object.seed = reader.readLong(offsets[13]);
+  object.startBindingId = reader.readString(offsets[14]);
+  object.strokeWidth = reader.readDouble(offsets[15]);
+  object.svgRelativePath = reader.readString(offsets[16]);
+  object.text = reader.readString(offsets[17]);
   object.type =
-      _ShapeElementtypeValueEnumMap[reader.readByteOrNull(offsets[14])] ??
+      _ShapeElementtypeValueEnumMap[reader.readByteOrNull(offsets[18])] ??
           ShapeType.line;
-  object.zOrder = reader.readLong(offsets[15]);
+  object.zOrder = reader.readLong(offsets[19]);
   return object;
 }
 
@@ -177,35 +207,43 @@ P _shapeElementDeserializeProp<P>(
     case 0:
       return (reader.readLong(offset)) as P;
     case 1:
-      return (reader.readLong(offset)) as P;
+      return (reader.readString(offset)) as P;
     case 2:
-      return (reader.readString(offset)) as P;
+      return (reader.readLong(offset)) as P;
     case 3:
-      return (reader.readDouble(offset)) as P;
-    case 4:
-      return (reader.readDoubleList(offset) ?? []) as P;
-    case 5:
-      return (reader.readBool(offset)) as P;
-    case 6:
       return (reader.readString(offset)) as P;
-    case 7:
+    case 4:
+      return (reader.readDouble(offset)) as P;
+    case 5:
+      return (reader.readDoubleList(offset) ?? []) as P;
+    case 6:
       return (reader.readBool(offset)) as P;
+    case 7:
+      return (reader.readString(offset)) as P;
     case 8:
       return (reader.readBool(offset)) as P;
     case 9:
-      return (reader.readDouble(offset)) as P;
+      return (reader.readBool(offset)) as P;
     case 10:
       return (reader.readDouble(offset)) as P;
     case 11:
       return (reader.readDouble(offset)) as P;
     case 12:
-      return (reader.readString(offset)) as P;
+      return (reader.readDouble(offset)) as P;
     case 13:
-      return (reader.readString(offset)) as P;
+      return (reader.readLong(offset)) as P;
     case 14:
+      return (reader.readString(offset)) as P;
+    case 15:
+      return (reader.readDouble(offset)) as P;
+    case 16:
+      return (reader.readString(offset)) as P;
+    case 17:
+      return (reader.readString(offset)) as P;
+    case 18:
       return (_ShapeElementtypeValueEnumMap[reader.readByteOrNull(offset)] ??
           ShapeType.line) as P;
-    case 15:
+    case 19:
       return (reader.readLong(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -287,6 +325,142 @@ extension ShapeElementQueryFilter
         includeLower: includeLower,
         upper: upper,
         includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<ShapeElement, ShapeElement, QAfterFilterCondition>
+      endBindingIdEqualTo(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'endBindingId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ShapeElement, ShapeElement, QAfterFilterCondition>
+      endBindingIdGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'endBindingId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ShapeElement, ShapeElement, QAfterFilterCondition>
+      endBindingIdLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'endBindingId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ShapeElement, ShapeElement, QAfterFilterCondition>
+      endBindingIdBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'endBindingId',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ShapeElement, ShapeElement, QAfterFilterCondition>
+      endBindingIdStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'endBindingId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ShapeElement, ShapeElement, QAfterFilterCondition>
+      endBindingIdEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'endBindingId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ShapeElement, ShapeElement, QAfterFilterCondition>
+      endBindingIdContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'endBindingId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ShapeElement, ShapeElement, QAfterFilterCondition>
+      endBindingIdMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'endBindingId',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ShapeElement, ShapeElement, QAfterFilterCondition>
+      endBindingIdIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'endBindingId',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<ShapeElement, ShapeElement, QAfterFilterCondition>
+      endBindingIdIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'endBindingId',
+        value: '',
       ));
     });
   }
@@ -993,6 +1167,262 @@ extension ShapeElementQueryFilter
         upper: upper,
         includeUpper: includeUpper,
         epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<ShapeElement, ShapeElement, QAfterFilterCondition>
+      roughnessEqualTo(
+    double value, {
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'roughness',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<ShapeElement, ShapeElement, QAfterFilterCondition>
+      roughnessGreaterThan(
+    double value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'roughness',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<ShapeElement, ShapeElement, QAfterFilterCondition>
+      roughnessLessThan(
+    double value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'roughness',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<ShapeElement, ShapeElement, QAfterFilterCondition>
+      roughnessBetween(
+    double lower,
+    double upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'roughness',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<ShapeElement, ShapeElement, QAfterFilterCondition> seedEqualTo(
+      int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'seed',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<ShapeElement, ShapeElement, QAfterFilterCondition>
+      seedGreaterThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'seed',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<ShapeElement, ShapeElement, QAfterFilterCondition> seedLessThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'seed',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<ShapeElement, ShapeElement, QAfterFilterCondition> seedBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'seed',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<ShapeElement, ShapeElement, QAfterFilterCondition>
+      startBindingIdEqualTo(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'startBindingId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ShapeElement, ShapeElement, QAfterFilterCondition>
+      startBindingIdGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'startBindingId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ShapeElement, ShapeElement, QAfterFilterCondition>
+      startBindingIdLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'startBindingId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ShapeElement, ShapeElement, QAfterFilterCondition>
+      startBindingIdBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'startBindingId',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ShapeElement, ShapeElement, QAfterFilterCondition>
+      startBindingIdStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'startBindingId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ShapeElement, ShapeElement, QAfterFilterCondition>
+      startBindingIdEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'startBindingId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ShapeElement, ShapeElement, QAfterFilterCondition>
+      startBindingIdContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'startBindingId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ShapeElement, ShapeElement, QAfterFilterCondition>
+      startBindingIdMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'startBindingId',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ShapeElement, ShapeElement, QAfterFilterCondition>
+      startBindingIdIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'startBindingId',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<ShapeElement, ShapeElement, QAfterFilterCondition>
+      startBindingIdIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'startBindingId',
+        value: '',
       ));
     });
   }

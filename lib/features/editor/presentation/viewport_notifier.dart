@@ -39,6 +39,19 @@ class ViewportState {
       (screen.dy - scrollY) / zoom,
     );
   }
+
+  /// Convert a scene-space point to screen coordinates (inverse of [toScene]).
+  Offset toViewport(Offset scene) {
+    return Offset(
+      scene.dx * zoom + scrollX,
+      scene.dy * zoom + scrollY,
+    );
+  }
+
+  /// Convert a scene-space rect to screen coordinates.
+  Rect toViewportRect(Rect scene) {
+    return Rect.fromPoints(toViewport(scene.topLeft), toViewport(scene.bottomRight));
+  }
 }
 
 class ViewportNotifier extends StateNotifier<ViewportState> {

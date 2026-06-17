@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
@@ -168,6 +170,65 @@ void main() {
       expect(p[0].x, closeTo(10, 1e-9));
       expect(p[0].y, closeTo(1, 1e-9));
       expect(canvasState.completedStrokes.single.size, 4.0);
+    });
+
+    test('rotates stroke points about the centre and restores on undo', () {
+      final original = makeStroke();
+      canvas.loadStrokes([original]);
+
+      final command = LassoTransformCommand(
+        canvasNotifier: canvas,
+        shapeNotifier: shapes,
+        center: Offset.zero,
+        rotation: math.pi / 2, // 90°: (x, y) -> (-y, x)
+        strokeIds: {'s1'},
+        shapeIds: const {},
+        strokesSnapshot: [original],
+        shapesSnapshot: const [],
+      );
+      command.execute();
+
+      final p = canvasState.completedStrokes.single.points;
+      expect(p[0].x, closeTo(-4, 1e-6));
+      expect(p[0].y, closeTo(3, 1e-6));
+      expect(p[1].x, closeTo(-6, 1e-6));
+      expect(p[1].y, closeTo(5, 1e-6));
+      // A pure rotation leaves the stroke width unchanged.
+      expect(canvasState.completedStrokes.single.size, closeTo(4.0, 1e-9));
+
+      command.undo();
+      final r = canvasState.completedStrokes.single.points;
+      expect(r[0].x, 3);
+      expect(r[0].y, 4);
+      expect(r[1].x, 5);
+      expect(r[1].y, 6);
+    });
+
+    test('rotates a shape via its rotation field, keeping geometry rigid', () {
+      final rect = makeRect(); // [0,0,10,10], centre (5,5)
+      shapes.addShape(rect);
+
+      final command = LassoTransformCommand(
+        canvasNotifier: canvas,
+        shapeNotifier: shapes,
+        center: const Offset(5, 5), // rotate about the shape's own centre
+        rotation: math.pi / 2,
+        strokeIds: const {},
+        shapeIds: {'r1'},
+        strokesSnapshot: const [],
+        shapesSnapshot: [rect],
+      );
+      command.execute();
+
+      final s = shapeState.shapes.single;
+      expect(s.rotation, closeTo(math.pi / 2, 1e-6));
+      // Rotating about its own centre re-centres to the same point -> geometry
+      // is unchanged; the rotation lives in the rotation field.
+      expect(s.geometryData, [0, 0, 10, 10]);
+
+      command.undo();
+      expect(shapeState.shapes.single.rotation, 0.0);
+      expect(shapeState.shapes.single.geometryData, [0, 0, 10, 10]);
     });
   });
 }

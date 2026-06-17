@@ -31,11 +31,15 @@ import '../widgets/template_picker.dart';
 import '../../domain/services/shape_geometry.dart';
 import '../shape_notifier.dart';
 import '../selection_notifier.dart';
+import '../eraser_notifier.dart';
+import '../../domain/services/eraser_service.dart';
+import '../../domain/undo_redo/lasso_delete_command.dart';
 import '../../domain/undo_redo/shape_add_command.dart';
 import '../canvas/input/shape_input_handler.dart';
 import '../canvas/input/lasso_input_handler.dart';
 import '../../domain/services/lasso_hit_tester.dart';
 import '../widgets/shape_toolbar.dart';
+import '../widgets/shape_style_panel.dart';
 import '../widgets/selection_overlay.dart' as app_sel;
 import '../widgets/text_box_overlay.dart';
 import '../widgets/text_element_overlay.dart';
@@ -109,6 +113,9 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> with Widget
       onPreviewUpdate: (preview) {
         ref.read(shapePreviewProvider.notifier).state = preview;
       },
+      getCurrentShapes: () => ref
+          .read(shapeProvider(ref.read(pageProvider(widget.notebookId)).currentPageIndex))
+          .shapes,
     );
 
     _lassoInputHandler = LassoInputHandler(
@@ -235,11 +242,72 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> with Widget
     _cacheManager.preloadAdjacent(widget.notebookId, newPageIndex);
   }
 
-  /// Erases both strokes and shapes near [scenePoint] (stroke eraser).
-  void _eraseAt(StrokePoint scenePoint, int pageIndex, double radius) {
-    ref.read(canvasStateProvider(pageIndex).notifier).eraseAtPoint(scenePoint, radius);
-    ref.read(shapeProvider(pageIndex).notifier).eraseAtPoint(scenePoint.toOffset(), radius);
+  // Previous stroke-eraser position (scene space); paired with the current
+  // point to form the segment tested each move so fast swipes skip nothing.
+  Offset? _lastEraseScene;
+
+  /// Begins a stroke-eraser gesture: clears any prior marks/trail.
+  void _beginErase(StrokePoint scenePoint, int pageIndex, double radius) {
+    _lastEraseScene = null;
+    ref.read(pendingEraseProvider.notifier).clear();
+    ref.read(eraserTrailProvider.notifier).clear();
+    _eraseAlong(scenePoint, pageIndex, radius);
+  }
+
+  /// Marks (does not delete) strokes/shapes the eraser segment crosses, dims
+  /// them via [pendingEraseProvider], and extends the animated trail.
+  void _eraseAlong(StrokePoint scenePoint, int pageIndex, double radius) {
+    final cur = scenePoint.toOffset();
+    final prev = _lastEraseScene ?? cur;
+    _lastEraseScene = cur;
+
+    final pending = ref.read(pendingEraseProvider);
+    final (strokeIds, shapeIds) = EraserService.hitAlongSegment(
+      a: prev,
+      b: cur,
+      radius: radius,
+      strokes: ref.read(canvasStateProvider(pageIndex)).completedStrokes,
+      shapes: ref.read(shapeProvider(pageIndex)).shapes,
+      skipStrokeIds: pending.strokeIds,
+      skipShapeIds: pending.shapeIds,
+    );
+    ref.read(pendingEraseProvider.notifier).addHits(strokeIds, shapeIds);
+    ref.read(eraserTrailProvider.notifier).addPoint(cur);
+  }
+
+  /// Commits the stroke-eraser gesture as a single undoable delete.
+  void _commitErase(int pageIndex) {
+    _lastEraseScene = null;
+    ref.read(eraserTrailProvider.notifier).clear();
+
+    final pending = ref.read(pendingEraseProvider);
+    if (pending.isEmpty) return;
+
+    final strokes = ref.read(canvasStateProvider(pageIndex)).completedStrokes;
+    final shapes = ref.read(shapeProvider(pageIndex)).shapes;
+    final deletedStrokes =
+        strokes.where((s) => pending.strokeIds.contains(s.id)).toList();
+    final deletedShapes =
+        shapes.where((s) => pending.shapeIds.contains(s.id)).toList();
+
+    final command = LassoDeleteCommand(
+      canvasNotifier: ref.read(canvasStateProvider(pageIndex).notifier),
+      shapeNotifier: ref.read(shapeProvider(pageIndex).notifier),
+      deletedStrokes: deletedStrokes,
+      deletedShapes: deletedShapes,
+    );
+    ref.read(undoRedoProvider(pageIndex).notifier).push(command);
+    command.execute();
+
+    ref.read(pendingEraseProvider.notifier).clear();
     _triggerAutosave();
+  }
+
+  /// Cancels an in-progress stroke-erase without deleting anything.
+  void _cancelErase() {
+    _lastEraseScene = null;
+    ref.read(pendingEraseProvider.notifier).clear();
+    ref.read(eraserTrailProvider.notifier).clear();
   }
 
   /// Convert a raw screen-space StrokePoint to scene coordinates using the current viewport.
@@ -262,6 +330,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> with Widget
     final toolState = ref.watch(toolProvider);
     final shapeState = ref.watch(shapeProvider(currentIndex));
     final selectionState = ref.watch(selectionProvider);
+    final pendingErase = ref.watch(pendingEraseProvider);
     final lassoPreviewPath = ref.watch(lassoPreviewProvider);
     final shapePreview = ref.watch(shapePreviewProvider);
     final activeTextBox = ref.watch(activeTextBoxProvider);
@@ -358,6 +427,8 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> with Widget
                     onStrokeCancel: () {
                       // Second pointer arrived mid-stroke — discard the in-flight stroke.
                       ref.read(canvasStateProvider(currentIndex).notifier).clearCurrentStroke();
+                      // Also abandon any in-progress stroke-erase (don't delete).
+                      _cancelErase();
                     },
                     onViewportUpdate: (panDelta, focalPoint, scaleDelta) {
                       final notifier = ref.read(viewportProvider.notifier);
@@ -378,7 +449,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> with Widget
                       } else if (toolState.activeTool == ToolType.lasso) {
                         _lassoInputHandler.onPointerDown(scenePoint.toOffset());
                       } else if (toolState.isEraser && toolState.eraserType == EraserType.stroke) {
-                        _eraseAt(scenePoint, currentIndex, toolState.size * 2);
+                        _beginErase(scenePoint, currentIndex, toolState.size * 2);
                       } else {
                         ref.read(canvasStateProvider(currentIndex).notifier).addPoint(scenePoint);
                       }
@@ -390,7 +461,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> with Widget
                       } else if (toolState.activeTool == ToolType.lasso) {
                         _lassoInputHandler.onPointerMove(scenePoint.toOffset());
                       } else if (toolState.isEraser && toolState.eraserType == EraserType.stroke) {
-                        _eraseAt(scenePoint, currentIndex, toolState.size * 2);
+                        _eraseAlong(scenePoint, currentIndex, toolState.size * 2);
                       } else {
                         ref.read(canvasStateProvider(currentIndex).notifier).addPoint(scenePoint);
                       }
@@ -419,6 +490,9 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> with Widget
                         }
 
                         _triggerAutosave();
+                      } else if (toolState.isEraser && toolState.eraserType == EraserType.stroke) {
+                        // Commit the whole stroke-erase gesture as one undo step.
+                        _commitErase(currentIndex);
                       }
                     },
                     child: Container(
@@ -441,6 +515,10 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> with Widget
                           selectionState: selectionState,
                           lassoPreviewPath: lassoPreviewPath,
                           pageIndex: currentIndex,
+                          pendingEraseStrokeIds: pendingErase.strokeIds,
+                          pendingEraseShapeIds: pendingErase.shapeIds,
+                          showEraserTrail: toolState.isEraser &&
+                              toolState.eraserType == EraserType.stroke,
                         ),
                       ),
                     ),
@@ -455,6 +533,10 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> with Widget
                     onChanged: _triggerAutosave,
                   ),
                   app_sel.SelectionOverlay(pageIndex: currentIndex),
+                  ShapeStylePanel(
+                    pageIndex: currentIndex,
+                    onChanged: _triggerAutosave,
+                  ),
                   if (activeTextBox != null || textBoxRect != null)
                     TextBoxOverlay(
                       pageIndex: currentIndex,

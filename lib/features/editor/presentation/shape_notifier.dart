@@ -34,6 +34,9 @@ class ShapeNotifier extends StateNotifier<ShapeState> {
 
   ShapeNotifier(this.pageIndex, this._repository) : super(const ShapeState());
 
+  /// Current shapes (read-only access for commands/services).
+  List<ShapeElement> get currentShapes => state.shapes;
+
   Future<void> loadForPage(int notebookId) async {
     state = state.copyWith(isLoading: true);
     try {
