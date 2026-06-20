@@ -34,12 +34,23 @@ class _ToolBarState extends ConsumerState<ToolBar> {
   }
 
   void _onEraserTap() {
-    final tool = ref.read(toolProvider.notifier);
-    if (ref.read(toolProvider).activeTool == ToolType.eraser) {
-      tool.toggleEraserType();
+    final wasEraser = ref.read(toolProvider).activeTool == ToolType.eraser;
+    if (wasEraser) {
+      // Re-tapping the active eraser toggles the size panel
+      // (long-press switches pixel/stroke type).
+      setState(() => _sizePanelOpen = !_sizePanelOpen);
     } else {
+      ref.read(toolProvider.notifier).setEraser();
+      setState(() => _sizePanelOpen = true);
+    }
+  }
+
+  void _onEraserLongPress() {
+    final tool = ref.read(toolProvider.notifier);
+    if (ref.read(toolProvider).activeTool != ToolType.eraser) {
       tool.setEraser();
     }
+    tool.toggleEraserType();
     setState(() => _sizePanelOpen = true);
   }
 
@@ -98,9 +109,10 @@ class _ToolBarState extends ConsumerState<ToolBar> {
                         isActive: toolState.activeTool == ToolType.eraser,
                         activeColor: AppColors.accentYellow,
                         onTap: _onEraserTap,
+                        onLongPress: _onEraserLongPress,
                         tooltip: toolState.eraserType == EraserType.pixel
-                            ? 'Pixel Eraser'
-                            : 'Stroke Eraser',
+                            ? 'Pixel Eraser (long-press to switch)'
+                            : 'Stroke Eraser (long-press to switch)',
                       ),
                       const SizedBox(height: 3),
 
@@ -269,7 +281,7 @@ class _SizeSliderPanel extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return Container(
       margin: const EdgeInsets.only(left: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(999),
@@ -280,17 +292,19 @@ class _SizeSliderPanel extends ConsumerWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           const Icon(Icons.line_weight,
-              size: 16, color: AppColors.textSecondary),
+              size: 14, color: AppColors.textSecondary),
+          const SizedBox(width: 4),
           SizedBox(
-            width: 130,
+            width: 96,
+            height: 24,
             child: SliderTheme(
               data: const SliderThemeData(
                 activeTrackColor: AppColors.accent,
                 inactiveTrackColor: AppColors.border,
                 thumbColor: AppColors.accent,
                 trackHeight: 3,
-                thumbShape: RoundSliderThumbShape(enabledThumbRadius: 6),
-                overlayShape: RoundSliderOverlayShape(overlayRadius: 14),
+                thumbShape: RoundSliderThumbShape(enabledThumbRadius: 5),
+                overlayShape: RoundSliderOverlayShape(overlayRadius: 8),
               ),
               child: Slider(
                 value: size,
@@ -302,14 +316,14 @@ class _SizeSliderPanel extends ConsumerWidget {
             ),
           ),
           SizedBox(
-            width: 20,
+            width: 18,
             child: Text(
               '${size.toInt()}',
               textAlign: TextAlign.center,
               style: const TextStyle(
                 fontFamily: 'Poppins',
                 color: AppColors.textPrimary,
-                fontSize: 12,
+                fontSize: 11,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -340,6 +354,7 @@ class _ToolButton extends StatelessWidget {
   final bool isActive;
   final Color activeColor;
   final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
   final String tooltip;
 
   const _ToolButton({
@@ -347,6 +362,7 @@ class _ToolButton extends StatelessWidget {
     required this.isActive,
     required this.activeColor,
     required this.onTap,
+    this.onLongPress,
     required this.tooltip,
   });
 
@@ -358,6 +374,7 @@ class _ToolButton extends StatelessWidget {
       message: tooltip,
       child: GestureDetector(
         onTap: onTap,
+        onLongPress: onLongPress,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 140),
           width: 38,
