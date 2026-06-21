@@ -1,0 +1,611 @@
+// Shared editor chrome for the unified canvas — the bottom tool/style bar, the
+// selection action bar, the app-bar actions (undo/redo + overflow menu), and the
+// style / library bottom sheets. Parameterised by [ScenePageKey] so the dev
+// playground and the real notebook editor drive the same controls over their own
+// page (and their own provider scope / store).
+
+import 'dart:math' as math;
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../domain/commands/scene_command.dart';
+import '../../domain/model/library_item.dart';
+import '../../domain/model/scene_element.dart';
+import '../../domain/services/alignment_service.dart';
+import '../../domain/services/library_service.dart';
+import '../../domain/services/selection_editing.dart';
+import '../../domain/services/z_order_service.dart';
+import '../../features/export/scene_export_service.dart';
+import '../state/clipboard_service.dart';
+import '../state/editor_tool_controller.dart';
+import '../state/history_controller.dart';
+import '../state/library_controller.dart';
+import '../state/scene_controller.dart';
+import '../state/scene_image_cache_provider.dart';
+import '../state/selection_controller.dart';
+import '../state/viewport_controller.dart';
+
+const List<int> kEditorPalette = [
+  0xFF1F2933,
+  0xFFE03131,
+  0xFF1971C2,
+  0xFF2F9E44,
+  0xFFF08C00,
+];
+
+const List<(EditorTool, IconData)> kEditorTools = [
+  (EditorTool.select, Icons.near_me_outlined),
+  (EditorTool.pen, Icons.edit),
+  (EditorTool.shape, Icons.category),
+  (EditorTool.text, Icons.title),
+  (EditorTool.frame, Icons.crop_free),
+  (EditorTool.eraser, Icons.cleaning_services_outlined),
+  (EditorTool.laser, Icons.flashlight_on_outlined),
+  (EditorTool.hand, Icons.pan_tool_alt),
+];
+
+const List<(ShapeType, IconData)> kEditorShapes = [
+  (ShapeType.rectangle, Icons.crop_square),
+  (ShapeType.circle, Icons.circle_outlined),
+  (ShapeType.diamond, Icons.diamond_outlined),
+  (ShapeType.triangle, Icons.change_history),
+  (ShapeType.line, Icons.remove),
+  (ShapeType.arrow, Icons.arrow_right_alt),
+];
+
+String editorNewId() =>
+    '${DateTime.now().microsecondsSinceEpoch}_${math.Random().nextInt(1 << 30)}';
+
+List<SceneElement> editorSelection(WidgetRef ref, ScenePageKey key) {
+  final ids = ref.read(selectionProvider);
+  return ref
+      .read(sceneControllerProvider(key))
+      .where((e) => ids.contains(e.id))
+      .toList();
+}
+
+/// Undo / redo + overflow menu (paste, library, export). Drop into AppBar.actions.
+class EditorAppBarActions extends ConsumerWidget {
+  final ScenePageKey pageKey;
+  const EditorAppBarActions({super.key, required this.pageKey});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final history = ref.watch(historyProvider(pageKey));
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      IconButton(
+        tooltip: 'Undo',
+        icon: const Icon(Icons.undo),
+        onPressed: history.canUndo
+            ? () => ref.read(historyProvider(pageKey).notifier).undo()
+            : null,
+      ),
+      IconButton(
+        tooltip: 'Redo',
+        icon: const Icon(Icons.redo),
+        onPressed: history.canRedo
+            ? () => ref.read(historyProvider(pageKey).notifier).redo()
+            : null,
+      ),
+      PopupMenuButton<String>(
+        tooltip: 'More',
+        icon: const Icon(Icons.more_vert),
+        onSelected: (v) {
+          switch (v) {
+            case 'paste':
+              _paste(ref);
+            case 'library':
+              _openLibrary(context, ref);
+            case 'png':
+            case 'svg':
+            case 'pdf':
+              _export(context, ref, v);
+          }
+        },
+        itemBuilder: (_) => const [
+          PopupMenuItem(value: 'paste', child: Text('Paste')),
+          PopupMenuItem(value: 'library', child: Text('Element library…')),
+          PopupMenuDivider(),
+          PopupMenuItem(value: 'png', child: Text('Export / share PNG')),
+          PopupMenuItem(value: 'svg', child: Text('Export / share SVG')),
+          PopupMenuItem(value: 'pdf', child: Text('Export / share PDF')),
+        ],
+      ),
+    ]);
+  }
+
+  Future<void> _paste(WidgetRef ref) async {
+    final els = await ClipboardService.paste(nextId: editorNewId);
+    if (els == null || els.isEmpty) return;
+    final base = ref.read(sceneControllerProvider(pageKey).notifier).nextZOrder();
+    final placed = [
+      for (int i = 0; i < els.length; i++)
+        ZOrderService.withZOrder(els[i], base + i)
+    ];
+    ref.read(historyProvider(pageKey).notifier).push(AddElementsCommand(placed));
+    ref.read(selectionProvider.notifier).selectMany(placed.map((e) => e.id));
+  }
+
+  Future<void> _openLibrary(BuildContext context, WidgetRef ref) async {
+    final item = await showModalBottomSheet<LibraryItem>(
+      context: context,
+      showDragHandle: true,
+      builder: (_) => const EditorLibrarySheet(),
+    );
+    if (item == null || !context.mounted) return;
+    final size = MediaQuery.of(context).size;
+    final at = ref
+        .read(viewportProvider)
+        .toScene(Offset(size.width / 2, size.height / 2));
+    final base = ref.read(sceneControllerProvider(pageKey).notifier).nextZOrder();
+    final els = LibraryService.instantiate(item,
+        at: at, nextId: editorNewId, baseZOrder: base);
+    if (els.isEmpty) return;
+    ref.read(historyProvider(pageKey).notifier).push(AddElementsCommand(els));
+    ref.read(selectionProvider.notifier).selectMany(els.map((e) => e.id));
+  }
+
+  Future<void> _export(BuildContext context, WidgetRef ref, String fmt) async {
+    final sel = editorSelection(ref, pageKey);
+    final els = sel.isNotEmpty ? sel : ref.read(sceneControllerProvider(pageKey));
+    if (els.isEmpty) {
+      _toast(context, 'Nothing to export');
+      return;
+    }
+    final cache = ref.read(sceneImageCacheProvider);
+    final ok = switch (fmt) {
+      'png' => await SceneExportService.sharePng(els, imageCache: cache),
+      'svg' => await SceneExportService.shareSvg(els),
+      'pdf' => await SceneExportService.sharePdf(els, imageCache: cache),
+      _ => false,
+    };
+    if (!ok && context.mounted) _toast(context, 'Nothing to export');
+  }
+
+  void _toast(BuildContext context, String msg) => ScaffoldMessenger.of(context)
+      .showSnackBar(SnackBar(content: Text(msg)));
+}
+
+/// The full bottom bar: selection actions + tools + style + palette + size.
+class EditorBottomBar extends ConsumerWidget {
+  final ScenePageKey pageKey;
+  const EditorBottomBar({super.key, required this.pageKey});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tool = ref.watch(editorToolProvider);
+    final selectedIds = ref.watch(selectionProvider);
+    final toolCtl = ref.read(editorToolProvider.notifier);
+
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (selectedIds.isNotEmpty) _SelectionBar(pageKey: pageKey),
+            Row(
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        for (final (t, icon) in kEditorTools)
+                          IconButton(
+                            isSelected: tool.tool == t,
+                            onPressed: () => toolCtl.setTool(t),
+                            icon: Icon(icon),
+                            style: IconButton.styleFrom(
+                              backgroundColor: tool.tool == t
+                                  ? Theme.of(context)
+                                      .colorScheme
+                                      .primaryContainer
+                                  : null,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+                IconButton.filledTonal(
+                  tooltip: 'Style',
+                  icon: const Icon(Icons.tune),
+                  onPressed: () => showModalBottomSheet<void>(
+                    context: context,
+                    showDragHandle: true,
+                    builder: (_) => const EditorStyleSheet(),
+                  ),
+                ),
+              ],
+            ),
+            if (tool.tool == EditorTool.shape) ...[
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 4,
+                children: [
+                  for (final (type, icon) in kEditorShapes)
+                    ChoiceChip(
+                      showCheckmark: false,
+                      label: Icon(icon, size: 18),
+                      selected: tool.shapeType == type,
+                      onSelected: (_) => toolCtl.setShapeType(type),
+                    ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                for (final c in kEditorPalette)
+                  GestureDetector(
+                    onTap: () => toolCtl.setColor(c),
+                    child: Container(
+                      width: 24,
+                      height: 24,
+                      margin: const EdgeInsets.symmetric(horizontal: 3),
+                      decoration: BoxDecoration(
+                        color: Color(c),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: tool.color == c ? Colors.black : Colors.black26,
+                          width: tool.color == c ? 3 : 1,
+                        ),
+                      ),
+                    ),
+                  ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Slider(
+                    min: 1,
+                    max: 24,
+                    value: tool.size.clamp(1, 24),
+                    onChanged: toolCtl.setSize,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SelectionBar extends ConsumerWidget {
+  final ScenePageKey pageKey;
+  const _SelectionBar({required this.pageKey});
+
+  List<SceneElement> _sel(WidgetRef ref) => editorSelection(ref, pageKey);
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final history = ref.read(historyProvider(pageKey).notifier);
+    final sel = ref.read(selectionProvider.notifier);
+    final ids = ref.read(selectionProvider);
+    final all = ref.read(sceneControllerProvider(pageKey));
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          IconButton(
+            tooltip: 'Delete',
+            icon: const Icon(Icons.delete_outline),
+            onPressed: () {
+              history.push(RemoveElementsCommand(_sel(ref)));
+              sel.clear();
+            },
+          ),
+          IconButton(
+            tooltip: 'Duplicate',
+            icon: const Icon(Icons.copy_all_outlined),
+            onPressed: () {
+              final copies = SelectionEditing.duplicate(_sel(ref),
+                  offset: const Offset(16, 16), nextId: editorNewId);
+              history.push(AddElementsCommand(copies));
+              sel.selectMany(copies.map((e) => e.id));
+            },
+          ),
+          IconButton(
+            tooltip: 'Copy',
+            icon: const Icon(Icons.content_copy),
+            onPressed: () => ClipboardService.copy(_sel(ref)),
+          ),
+          IconButton(
+            tooltip: 'Save to library',
+            icon: const Icon(Icons.bookmark_add_outlined),
+            onPressed: () => _saveToLibrary(context, ref),
+          ),
+          IconButton(
+            tooltip: 'Group',
+            icon: const Icon(Icons.join_full),
+            onPressed: () {
+              final before = _sel(ref);
+              final gid = editorNewId();
+              history.push(UpdateElementsCommand(
+                before: before,
+                after: [
+                  for (final e in before) SelectionEditing.withGroup(e, gid)
+                ],
+              ));
+            },
+          ),
+          IconButton(
+            tooltip: 'Ungroup',
+            icon: const Icon(Icons.join_inner),
+            onPressed: () {
+              final before = _sel(ref);
+              history.push(UpdateElementsCommand(
+                before: before,
+                after: [
+                  for (final e in before) SelectionEditing.withGroup(e, '')
+                ],
+              ));
+            },
+          ),
+          IconButton(
+            tooltip: 'Lock',
+            icon: const Icon(Icons.lock_outline),
+            onPressed: () {
+              final before = _sel(ref);
+              history.push(UpdateElementsCommand(
+                before: before,
+                after: [
+                  for (final e in before) SelectionEditing.withLocked(e, true)
+                ],
+              ));
+              sel.clear();
+            },
+          ),
+          const VerticalDivider(width: 12),
+          IconButton(
+            tooltip: 'Bring to front',
+            icon: const Icon(Icons.flip_to_front),
+            onPressed: () => history.push(ReplaceAllCommand(
+                before: all, after: ZOrderService.bringToFront(all, ids))),
+          ),
+          IconButton(
+            tooltip: 'Send to back',
+            icon: const Icon(Icons.flip_to_back),
+            onPressed: () => history.push(ReplaceAllCommand(
+                before: all, after: ZOrderService.sendToBack(all, ids))),
+          ),
+          const VerticalDivider(width: 12),
+          IconButton(
+            tooltip: 'Align left',
+            icon: const Icon(Icons.align_horizontal_left),
+            onPressed: () => _align(ref, history, AlignEdge.left),
+          ),
+          IconButton(
+            tooltip: 'Align centre',
+            icon: const Icon(Icons.align_horizontal_center),
+            onPressed: () => _align(ref, history, AlignEdge.centerH),
+          ),
+          IconButton(
+            tooltip: 'Align top',
+            icon: const Icon(Icons.align_vertical_top),
+            onPressed: () => _align(ref, history, AlignEdge.top),
+          ),
+          IconButton(
+            tooltip: 'Distribute horizontally',
+            icon: const Icon(Icons.horizontal_distribute),
+            onPressed: () {
+              final before = _sel(ref);
+              history.push(UpdateElementsCommand(
+                before: before,
+                after:
+                    AlignmentService.distribute(before, SceneAxis.horizontal),
+              ));
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _align(WidgetRef ref, HistoryController history, AlignEdge edge) {
+    final before = _sel(ref);
+    history.push(UpdateElementsCommand(
+      before: before,
+      after: AlignmentService.align(before, edge),
+    ));
+  }
+
+  Future<void> _saveToLibrary(BuildContext context, WidgetRef ref) async {
+    final selected = _sel(ref);
+    if (selected.isEmpty) return;
+    final name = await _promptName(context);
+    if (name == null) return;
+    await ref
+        .read(libraryProvider.notifier)
+        .addFromElements(name, selected, id: editorNewId());
+    if (context.mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Saved "$name" to library')));
+    }
+  }
+
+  Future<String?> _promptName(BuildContext context) {
+    final controller = TextEditingController();
+    String? clean(String v) => v.trim().isEmpty ? null : v.trim();
+    return showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Save to library'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: 'Item name'),
+          onSubmitted: (v) => Navigator.of(context).pop(clean(v)),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.of(context).pop(clean(controller.text)),
+              child: const Text('Save')),
+        ],
+      ),
+    );
+  }
+}
+
+/// Lists saved library items; returns the chosen one to the caller (which
+/// performs the insert in its own provider scope).
+class EditorLibrarySheet extends ConsumerWidget {
+  const EditorLibrarySheet({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final items = ref.watch(libraryProvider);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+      child: items.isEmpty
+          ? const Padding(
+              padding: EdgeInsets.all(24),
+              child: Text(
+                'No saved items yet.\nSelect elements, then "Save to library".',
+                textAlign: TextAlign.center,
+              ),
+            )
+          : ListView(
+              shrinkWrap: true,
+              children: [
+                for (final item in items)
+                  ListTile(
+                    leading: const Icon(Icons.dashboard_customize_outlined),
+                    title: Text(item.name),
+                    subtitle: Text('${item.elements.length} element(s)'),
+                    onTap: () => Navigator.of(context).pop(item),
+                    trailing: IconButton(
+                      tooltip: 'Delete',
+                      icon: const Icon(Icons.delete_outline),
+                      onPressed: () =>
+                          ref.read(libraryProvider.notifier).remove(item.id),
+                    ),
+                  ),
+              ],
+            ),
+    );
+  }
+}
+
+class EditorStyleSheet extends ConsumerWidget {
+  const EditorStyleSheet({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tool = ref.watch(editorToolProvider);
+    final c = ref.read(editorToolProvider.notifier);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+      child: ListView(
+        shrinkWrap: true,
+        children: [
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Pixel eraser (vs element eraser)'),
+            value: tool.eraserPixel,
+            onChanged: c.setEraserPixel,
+          ),
+          const Divider(),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Fill'),
+            value: tool.hasFill,
+            onChanged: c.setHasFill,
+          ),
+          _row(
+              'Fill style',
+              SegmentedButton<FillStyle>(
+                showSelectedIcon: false,
+                segments: const [
+                  ButtonSegment(value: FillStyle.hachure, label: Text('Hachure')),
+                  ButtonSegment(value: FillStyle.crossHatch, label: Text('Cross')),
+                  ButtonSegment(value: FillStyle.solid, label: Text('Solid')),
+                ],
+                selected: {tool.fillStyle},
+                onSelectionChanged: (s) => c.setFillStyle(s.first),
+              )),
+          _row(
+              'Stroke style',
+              SegmentedButton<StrokeStyle>(
+                showSelectedIcon: false,
+                segments: const [
+                  ButtonSegment(value: StrokeStyle.solid, label: Text('Solid')),
+                  ButtonSegment(value: StrokeStyle.dashed, label: Text('Dashed')),
+                  ButtonSegment(value: StrokeStyle.dotted, label: Text('Dotted')),
+                ],
+                selected: {tool.strokeStyle},
+                onSelectionChanged: (s) => c.setStrokeStyle(s.first),
+              )),
+          _row(
+              'Edges',
+              SegmentedButton<EdgeStyle>(
+                showSelectedIcon: false,
+                segments: const [
+                  ButtonSegment(value: EdgeStyle.sharp, label: Text('Sharp')),
+                  ButtonSegment(value: EdgeStyle.round, label: Text('Round')),
+                ],
+                selected: {tool.edges},
+                onSelectionChanged: (s) => c.setEdges(s.first),
+              )),
+          _row(
+              'Arrowhead',
+              SegmentedButton<Arrowhead>(
+                showSelectedIcon: false,
+                segments: const [
+                  ButtonSegment(value: Arrowhead.none, label: Text('None')),
+                  ButtonSegment(value: Arrowhead.triangle, label: Text('Tri')),
+                  ButtonSegment(value: Arrowhead.dot, label: Text('Dot')),
+                  ButtonSegment(value: Arrowhead.bar, label: Text('Bar')),
+                ],
+                selected: {tool.endArrowhead},
+                onSelectionChanged: (s) => c.setEndArrowhead(s.first),
+              )),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Elbow arrow'),
+            value: tool.elbowed,
+            onChanged: c.setElbowed,
+          ),
+          _slider('Roughness', tool.roughness, 0, 3, c.setRoughness),
+          _slider('Opacity', tool.opacity, 0.1, 1, c.setOpacity),
+        ],
+      ),
+    );
+  }
+
+  Widget _row(String label, Widget child) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label),
+            Flexible(
+                child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal, child: child)),
+          ],
+        ),
+      );
+
+  Widget _slider(String label, double value, double min, double max,
+          ValueChanged<double> onChanged) =>
+      Row(
+        children: [
+          SizedBox(width: 80, child: Text(label)),
+          Expanded(
+            child: Slider(
+              min: min,
+              max: max,
+              value: value.clamp(min, max),
+              onChanged: onChanged,
+            ),
+          ),
+        ],
+      );
+}

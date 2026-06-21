@@ -1,0 +1,60 @@
+// Holds the element library and persists changes through a [LibraryRepository].
+// The library is global (not per-page), so this is a single provider.
+
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../data/persistence/library_repository.dart';
+import '../../domain/model/library_item.dart';
+import '../../domain/model/scene_element.dart';
+
+class LibraryController extends StateNotifier<List<LibraryItem>> {
+  final LibraryRepository _repo;
+  LibraryController(this._repo) : super(const []);
+
+  Future<void> load() async {
+    state = List.unmodifiable(await _repo.load());
+  }
+
+  /// Saves [elements] as a new named library item (the cluster is stored in its
+  /// current scene coordinates; insertion repositions it).
+  Future<LibraryItem> addFromElements(
+    String name,
+    List<SceneElement> elements, {
+    required String id,
+  }) async {
+    final item = LibraryItem(
+      id: id,
+      name: name,
+      createdAt: DateTime.now(),
+      elements: List.of(elements),
+    );
+    state = List.unmodifiable([...state, item]);
+    await _repo.saveAll(state);
+    return item;
+  }
+
+  Future<void> rename(String id, String name) async {
+    state = List.unmodifiable([
+      for (final i in state) i.id == id ? i.copyWith(name: name) : i,
+    ]);
+    await _repo.saveAll(state);
+  }
+
+  Future<void> remove(String id) async {
+    state = List.unmodifiable([
+      for (final i in state)
+        if (i.id != id) i,
+    ]);
+    await _repo.saveAll(state);
+  }
+}
+
+/// In-memory by default; the dev playground and tests override this, and the
+/// real app wires a [FileLibraryRepository] when launch persistence lands.
+final libraryRepositoryProvider =
+    Provider<LibraryRepository>((ref) => InMemoryLibraryRepository());
+
+final libraryProvider =
+    StateNotifierProvider<LibraryController, List<LibraryItem>>(
+  (ref) => LibraryController(ref.watch(libraryRepositoryProvider)),
+);

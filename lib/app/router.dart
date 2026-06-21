@@ -4,11 +4,12 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../features/home/presentation/screens/home_screen.dart';
-import '../features/editor/presentation/screens/note_editor_screen.dart';
-import '../features/editor/presentation/screens/book_view_screen.dart';
 import '../features/import/presentation/pdf_import_screen.dart';
 import '../features/settings/presentation/screens/settings_screen.dart';
 import '../features/settings/presentation/screens/about_screen.dart';
+import '../editor/ui/scene_editor_screen.dart';
+import '../editor/ui/notebook_editor_screen.dart';
+import '../editor/ui/notebook_book_view_screen.dart';
 
 final GoRouter appRouter = GoRouter(
   initialLocation: '/',
@@ -34,18 +35,19 @@ final GoRouter appRouter = GoRouter(
         return const HomeScreen();
       },
     ),
+    // Canvas 2.0 — the unified drawing engine, now the default editor.
     GoRoute(
-      path: '/note/:id',
+      path: '/note2/:id',
       builder: (context, state) {
         final id = int.parse(state.pathParameters['id']!);
-        return NoteEditorScreen(notebookId: id);
+        return NotebookEditorScreen(notebookId: id);
       },
       routes: [
         GoRoute(
           path: 'book',
           builder: (context, state) {
             final id = int.parse(state.pathParameters['id']!);
-            return BookViewScreen(notebookId: id);
+            return NotebookBookViewScreen(notebookId: id);
           },
         ),
       ],
@@ -57,6 +59,12 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/about',
       builder: (context, state) => const AboutScreen(),
+    ),
+    // Dev-only: unified canvas playground (Phase 2). Surfaced from Settings when
+    // Developer Mode is enabled.
+    GoRoute(
+      path: '/canvas-demo',
+      builder: (context, state) => const SceneEditorScreen(),
     ),
   ],
 );

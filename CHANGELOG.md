@@ -14,6 +14,33 @@ Versioning: `MAJOR.MINOR.PATCH+BUILD`
   Entries below are keyed by the semantic version; the exact `+BUILD` you see
   in-app is whatever commit you're on.
 
+## [1.1.0] - 2026-06-21
+### Added
+- **Canvas 2.0 — a ground-up rebuilt drawing engine (beta, opt-in).** Turn it
+  on in **Settings → Editor → "Canvas 2.0 editor"** to open notebooks in the new
+  engine; the classic editor stays the default and is unchanged. Built over a
+  unified element model with near-Excalidraw drawing parity:
+  - One model for ink, shapes, text, images and **frames**, with multi-select
+    (marquee + 8 handles + rotate), grouping, alignment/distribution, snapping
+    with guides, z-ordering, and lock.
+  - Full shape styling: hachure / cross-hatch / solid fills, solid / dashed /
+    dotted strokes, rounded edges, arrowheads, elbow arrows, and a
+    hand-drawn "rough" look.
+  - **Frames** — named containers that clip and move their contents together.
+  - **Element library** — save a selection as a reusable item and drop it onto
+    any page (persisted on-device).
+  - **Export & share** to PNG, SVG and PDF (the selection or the whole page),
+    and **copy/paste** elements across pages via the system clipboard.
+  - Eraser (stroke and pixel), laser pointer, and full **undo/redo** across
+    every edit.
+  - A redesigned read-only **Book View** with swipeable spreads and a thumbnail
+    filmstrip, on each notebook's paper colour.
+- Real embedded images now render on the canvas and in exports.
+### Changed
+- Existing notebooks are migrated into the new unified storage on first launch.
+  The migration is **non-destructive** — your original `.ink` files and page
+  data are left untouched, so the classic editor keeps working exactly as before.
+
 ## [1.0.2] - 2026-06-16
 ### Fixed
 - Palm rejection is now order-independent and far more consistent. Previously a

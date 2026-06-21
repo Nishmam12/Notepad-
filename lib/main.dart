@@ -1,11 +1,18 @@
 // Entry point — initializes Isar database and launches the app with Riverpod.
 
+import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path_provider/path_provider.dart';
 
 import 'app/app.dart';
+import 'data/migration/launch_migration.dart';
+import 'data/persistence/library_repository.dart';
+import 'data/persistence/scene_element_record.dart';
+import 'editor/state/library_controller.dart';
+import 'editor/state/scene_controller.dart';
 import 'shared/isar/isar_service.dart';
 import 'features/home/domain/models/notebook.dart';
 import 'features/home/domain/models/note_page.dart';
@@ -68,15 +75,32 @@ void main() async {
     );
   };
 
-  // Open Isar with all collection schemas before the app starts.
+  // Open Isar with all collection schemas before the app starts. The new
+  // unified collections (SceneElementRecord/AppMeta) are additive — Isar
+  // auto-migrates the on-disk schema and existing Notebook/NotePage data is
+  // untouched.
   await IsarService.openDatabase([
     NotebookSchema,
     NotePageSchema,
+    SceneElementRecordSchema,
+    AppMetaSchema,
   ]);
 
+  // One-time, gated, non-destructive migration of legacy page content into the
+  // unified store. Never throws (legacy data and the old screens keep working).
+  await runLaunchMigration();
+
+  final appDocsPath = (await getApplicationDocumentsDirectory()).path;
+
   runApp(
-    const ProviderScope(
-      child: InkFlowApp(),
+    ProviderScope(
+      overrides: [
+        appDocsPathProvider.overrideWithValue(appDocsPath),
+        libraryRepositoryProvider.overrideWithValue(
+          FileLibraryRepository(File('$appDocsPath/inkflow_library.json')),
+        ),
+      ],
+      child: const InkFlowApp(),
     ),
   );
 }

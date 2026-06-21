@@ -116,7 +116,7 @@ class HomeScreen extends ConsumerWidget {
           final notebook = notebooks[index];
           return _NotebookCard(
             notebook: notebook,
-            onTap: () => context.push('/note/${notebook.id}'),
+            onTap: () => context.push('/note2/${notebook.id}'),
             onLongPress: () => _confirmDelete(context, ref, notebook),
           );
         },

@@ -61,6 +61,17 @@ class SettingsScreen extends ConsumerWidget {
                   onChanged: notifier.toggleDevMode,
                 ),
               ),
+              if (settings.devMode)
+                _SettingsRow(
+                  icon: Icons.brush_outlined,
+                  title: 'Canvas 2.0 (dev)',
+                  subtitle: 'Preview the rebuilt drawing canvas',
+                  trailing: const Icon(
+                    Icons.chevron_right,
+                    color: AppColors.textMuted,
+                  ),
+                  onTap: () => context.push('/canvas-demo'),
+                ),
             ],
           ),
           const _SectionHeader('About'),
