@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:inkflow/editor/state/viewport_controller.dart';
 
@@ -32,12 +33,29 @@ void main() {
       expect(sceneAfter.dy, closeTo(sceneBefore.dy, 1e-9));
     });
 
-    test('zoom clamps to [minZoom, maxZoom]', () {
+    test('zoom clamps to infinite-mode [minZoom, maxZoom] by default', () {
       final c = ViewportController();
       c.zoomAtPoint(99, Offset.zero);
-      expect(c.state.zoom, ViewportController.maxZoom);
+      expect(c.state.zoom, ViewportController.infiniteMaxZoom);
       c.zoomAtPoint(0.0001, Offset.zero);
-      expect(c.state.zoom, ViewportController.minZoom);
+      expect(c.state.zoom, ViewportController.infiniteMinZoom);
+    });
+
+    test('page mode clamps zoom to 50–300% and centres a small page', () {
+      final c = ViewportController();
+      c.configure(
+        pageMode: true,
+        pageSize: const Size(100, 200),
+        viewportSize: const Size(100, 200),
+      );
+      // Zoom is limited to the page range.
+      c.zoomAtPoint(99, const Offset(50, 100));
+      expect(c.state.zoom, ViewportController.pageMaxZoom);
+      c.zoomAtPoint(0.0001, const Offset(50, 100));
+      expect(c.state.zoom, ViewportController.pageMinZoom);
+      // At 50% the page is smaller than the viewport, so it is centred.
+      expect(c.state.scrollX, closeTo((100 - 100 * 0.5) / 2, 1e-9));
+      expect(c.state.scrollY, closeTo((200 - 200 * 0.5) / 2, 1e-9));
     });
 
     test('reset returns to identity', () {

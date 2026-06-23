@@ -27,23 +27,28 @@ const NotebookSchema = CollectionSchema(
       name: r'createdAt',
       type: IsarType.dateTime,
     ),
-    r'modifiedAt': PropertySchema(
+    r'layoutMode': PropertySchema(
       id: 2,
+      name: r'layoutMode',
+      type: IsarType.long,
+    ),
+    r'modifiedAt': PropertySchema(
+      id: 3,
       name: r'modifiedAt',
       type: IsarType.dateTime,
     ),
     r'pageCount': PropertySchema(
-      id: 3,
+      id: 4,
       name: r'pageCount',
       type: IsarType.long,
     ),
     r'templateIndex': PropertySchema(
-      id: 4,
+      id: 5,
       name: r'templateIndex',
       type: IsarType.long,
     ),
     r'title': PropertySchema(
-      id: 5,
+      id: 6,
       name: r'title',
       type: IsarType.string,
     )
@@ -94,10 +99,11 @@ void _notebookSerialize(
 ) {
   writer.writeLong(offsets[0], object.backgroundColor);
   writer.writeDateTime(offsets[1], object.createdAt);
-  writer.writeDateTime(offsets[2], object.modifiedAt);
-  writer.writeLong(offsets[3], object.pageCount);
-  writer.writeLong(offsets[4], object.templateIndex);
-  writer.writeString(offsets[5], object.title);
+  writer.writeLong(offsets[2], object.layoutMode);
+  writer.writeDateTime(offsets[3], object.modifiedAt);
+  writer.writeLong(offsets[4], object.pageCount);
+  writer.writeLong(offsets[5], object.templateIndex);
+  writer.writeString(offsets[6], object.title);
 }
 
 Notebook _notebookDeserialize(
@@ -110,10 +116,11 @@ Notebook _notebookDeserialize(
   object.backgroundColor = reader.readLong(offsets[0]);
   object.createdAt = reader.readDateTime(offsets[1]);
   object.id = id;
-  object.modifiedAt = reader.readDateTime(offsets[2]);
-  object.pageCount = reader.readLong(offsets[3]);
-  object.templateIndex = reader.readLong(offsets[4]);
-  object.title = reader.readString(offsets[5]);
+  object.layoutMode = reader.readLong(offsets[2]);
+  object.modifiedAt = reader.readDateTime(offsets[3]);
+  object.pageCount = reader.readLong(offsets[4]);
+  object.templateIndex = reader.readLong(offsets[5]);
+  object.title = reader.readString(offsets[6]);
   return object;
 }
 
@@ -129,12 +136,14 @@ P _notebookDeserializeProp<P>(
     case 1:
       return (reader.readDateTime(offset)) as P;
     case 2:
-      return (reader.readDateTime(offset)) as P;
-    case 3:
       return (reader.readLong(offset)) as P;
+    case 3:
+      return (reader.readDateTime(offset)) as P;
     case 4:
       return (reader.readLong(offset)) as P;
     case 5:
+      return (reader.readLong(offset)) as P;
+    case 6:
       return (reader.readString(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -489,6 +498,59 @@ extension NotebookQueryFilter
     });
   }
 
+  QueryBuilder<Notebook, Notebook, QAfterFilterCondition> layoutModeEqualTo(
+      int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'layoutMode',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Notebook, Notebook, QAfterFilterCondition> layoutModeGreaterThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'layoutMode',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Notebook, Notebook, QAfterFilterCondition> layoutModeLessThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'layoutMode',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Notebook, Notebook, QAfterFilterCondition> layoutModeBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'layoutMode',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
   QueryBuilder<Notebook, Notebook, QAfterFilterCondition> modifiedAtEqualTo(
       DateTime value) {
     return QueryBuilder.apply(this, (query) {
@@ -811,6 +873,18 @@ extension NotebookQuerySortBy on QueryBuilder<Notebook, Notebook, QSortBy> {
     });
   }
 
+  QueryBuilder<Notebook, Notebook, QAfterSortBy> sortByLayoutMode() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'layoutMode', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Notebook, Notebook, QAfterSortBy> sortByLayoutModeDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'layoutMode', Sort.desc);
+    });
+  }
+
   QueryBuilder<Notebook, Notebook, QAfterSortBy> sortByModifiedAt() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'modifiedAt', Sort.asc);
@@ -898,6 +972,18 @@ extension NotebookQuerySortThenBy
     });
   }
 
+  QueryBuilder<Notebook, Notebook, QAfterSortBy> thenByLayoutMode() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'layoutMode', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Notebook, Notebook, QAfterSortBy> thenByLayoutModeDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'layoutMode', Sort.desc);
+    });
+  }
+
   QueryBuilder<Notebook, Notebook, QAfterSortBy> thenByModifiedAt() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'modifiedAt', Sort.asc);
@@ -961,6 +1047,12 @@ extension NotebookQueryWhereDistinct
     });
   }
 
+  QueryBuilder<Notebook, Notebook, QDistinct> distinctByLayoutMode() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'layoutMode');
+    });
+  }
+
   QueryBuilder<Notebook, Notebook, QDistinct> distinctByModifiedAt() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'modifiedAt');
@@ -1004,6 +1096,12 @@ extension NotebookQueryProperty
   QueryBuilder<Notebook, DateTime, QQueryOperations> createdAtProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'createdAt');
+    });
+  }
+
+  QueryBuilder<Notebook, int, QQueryOperations> layoutModeProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'layoutMode');
     });
   }
 

@@ -84,6 +84,18 @@ class NoteRepository {
     }
   }
 
+  /// Updates the canvas layout mode (0 = infinite, 1 = single page).
+  Future<void> updateLayoutMode(int id, int layoutMode) async {
+    final notebook = await _isar.notebooks.get(id);
+    if (notebook != null) {
+      notebook.layoutMode = layoutMode;
+      notebook.modifiedAt = DateTime.now();
+      await _isar.writeTxn(() async {
+        await _isar.notebooks.put(notebook);
+      });
+    }
+  }
+
   /// Gets a notebook by ID.
   Future<Notebook?> getNotebook(int id) async {
     return await _isar.notebooks.get(id);

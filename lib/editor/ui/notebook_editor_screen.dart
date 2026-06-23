@@ -11,8 +11,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/constants/app_colors.dart';
 import '../../features/editor/domain/models/template_type.dart';
 import '../../features/editor/presentation/page_notifier.dart';
+import '../../features/home/data/repositories/note_repository.dart';
 import '../../features/home/domain/models/notebook.dart';
 import '../../shared/isar/isar_service.dart';
 import '../state/library_controller.dart';
@@ -57,6 +59,8 @@ class _NotebookEditorScreenState extends ConsumerState<NotebookEditorScreen> {
         : TemplateType.blank;
   }
 
+  bool get _pageMode => (_notebook?.layoutMode ?? 0) == 1;
+
   /// Loads a page's elements from the store once per session.
   void _ensureLoaded(ScenePageKey key) {
     if (_loadedPages.contains(key.pageId)) return;
@@ -74,7 +78,8 @@ class _NotebookEditorScreenState extends ConsumerState<NotebookEditorScreen> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    final index = pageState.currentPageIndex.clamp(0, pageState.pages.length - 1);
+    final index =
+        pageState.currentPageIndex.clamp(0, pageState.pages.length - 1);
     final page = pageState.pages[index];
     final key = (notebookId: widget.notebookId, pageId: page.id);
     _ensureLoaded(key);
@@ -84,10 +89,14 @@ class _NotebookEditorScreenState extends ConsumerState<NotebookEditorScreen> {
         title: Text(_notebook?.title ?? 'Notebook'),
         actions: [
           IconButton(
+            tooltip: 'Background & paper',
+            icon: const Icon(Icons.wallpaper_outlined),
+            onPressed: _notebook == null ? null : _showBackgroundSheet,
+          ),
+          IconButton(
             tooltip: 'Book view',
             icon: const Icon(Icons.menu_book_outlined),
-            onPressed: () =>
-                context.push('/note2/${widget.notebookId}/book'),
+            onPressed: () => context.push('/note2/${widget.notebookId}/book'),
           ),
           Center(child: Text('${(zoom * 100).round()}%')),
           IconButton(
@@ -95,33 +104,43 @@ class _NotebookEditorScreenState extends ConsumerState<NotebookEditorScreen> {
             icon: const Icon(Icons.center_focus_strong),
             onPressed: () => ref.read(viewportProvider.notifier).reset(),
           ),
-          EditorAppBarActions(pageKey: key),
-        ],
-      ),
-      body: SceneCanvas(
-        key: ValueKey(page.id),
-        notebookId: widget.notebookId,
-        pageId: page.id,
-        backgroundColor: _paperColor,
-        templateType: _template,
-      ),
-      bottomNavigationBar: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _PageNavBar(
-            index: index,
-            count: pageState.pages.length,
-            onPrev: index > 0
-                ? () => _switchTo(index - 1)
-                : null,
-            onNext: index < pageState.pages.length - 1
-                ? () => _switchTo(index + 1)
-                : null,
-            onAdd: () =>
-                ref.read(pageProvider(widget.notebookId).notifier).insertPage(),
+          EditorAppBarActions(
+            pageKey: key,
+            onChangeBackground: _notebook == null ? null : _showBackgroundSheet,
           ),
-          EditorBottomBar(pageKey: key),
         ],
+      ),
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: SceneCanvas(
+              key: ValueKey(page.id),
+              notebookId: widget.notebookId,
+              pageId: page.id,
+              backgroundColor: _paperColor,
+              templateType: _template,
+              pageMode: _pageMode,
+            ),
+          ),
+          // Quick-access tool bar overlaid at the top with a translucent
+          // background, freeing the bottom for page navigation.
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: EditorBottomBar(pageKey: key, floating: true),
+          ),
+        ],
+      ),
+      bottomNavigationBar: _PageNavBar(
+        index: index,
+        count: pageState.pages.length,
+        onPrev: index > 0 ? () => _switchTo(index - 1) : null,
+        onNext: index < pageState.pages.length - 1
+            ? () => _switchTo(index + 1)
+            : null,
+        onAdd: () =>
+            ref.read(pageProvider(widget.notebookId).notifier).insertPage(),
       ),
     );
   }
@@ -129,6 +148,169 @@ class _NotebookEditorScreenState extends ConsumerState<NotebookEditorScreen> {
   void _switchTo(int i) {
     ref.read(selectionProvider.notifier).clear();
     ref.read(pageProvider(widget.notebookId).notifier).switchPage(i);
+  }
+
+  Future<void> _showBackgroundSheet() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (_) => _BackgroundSheet(
+        template: _template,
+        paperColor: _paperColor,
+        pageMode: _pageMode,
+        onTemplate: _setTemplate,
+        onColor: _setPaperColor,
+        onPageMode: _setLayoutMode,
+      ),
+    );
+  }
+
+  void _setLayoutMode(bool pageMode) {
+    final nb = _notebook;
+    if (nb == null) return;
+    final mode = pageMode ? 1 : 0;
+    setState(() => nb.layoutMode = mode);
+    NoteRepository(IsarService.instance)
+        .updateLayoutMode(widget.notebookId, mode);
+  }
+
+  void _setTemplate(TemplateType type) {
+    final nb = _notebook;
+    if (nb == null) return;
+    setState(() => nb.templateIndex = type.index);
+    NoteRepository(IsarService.instance)
+        .updateTemplateIndex(widget.notebookId, type.index);
+  }
+
+  void _setPaperColor(Color color) {
+    final nb = _notebook;
+    if (nb == null) return;
+    final argb = color.toARGB32();
+    setState(() => nb.backgroundColor = argb);
+    NoteRepository(IsarService.instance)
+        .updateBackgroundColor(widget.notebookId, argb);
+  }
+}
+
+/// Bottom sheet to pick the page template and paper colour. Selections apply
+/// live (the parent persists them and rebuilds the canvas) so the sheet can
+/// stay open while the user tries combinations.
+class _BackgroundSheet extends StatefulWidget {
+  final TemplateType template;
+  final Color paperColor;
+  final bool pageMode;
+  final ValueChanged<TemplateType> onTemplate;
+  final ValueChanged<Color> onColor;
+  final ValueChanged<bool> onPageMode;
+
+  const _BackgroundSheet({
+    required this.template,
+    required this.paperColor,
+    required this.pageMode,
+    required this.onTemplate,
+    required this.onColor,
+    required this.onPageMode,
+  });
+
+  @override
+  State<_BackgroundSheet> createState() => _BackgroundSheetState();
+}
+
+class _BackgroundSheetState extends State<_BackgroundSheet> {
+  static const _papers = <Color>[
+    AppColors.paperWhite,
+    AppColors.paperCream,
+    AppColors.paperBlush,
+  ];
+
+  late TemplateType _template = widget.template;
+  late Color _color = widget.paperColor;
+  late bool _pageMode = widget.pageMode;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Layout', style: theme.textTheme.titleMedium),
+            const SizedBox(height: 12),
+            SegmentedButton<bool>(
+              showSelectedIcon: false,
+              segments: const [
+                ButtonSegment(
+                  value: false,
+                  icon: Icon(Icons.all_out),
+                  label: Text('Infinite'),
+                ),
+                ButtonSegment(
+                  value: true,
+                  icon: Icon(Icons.insert_drive_file_outlined),
+                  label: Text('Single page'),
+                ),
+              ],
+              selected: {_pageMode},
+              onSelectionChanged: (s) {
+                setState(() => _pageMode = s.first);
+                widget.onPageMode(s.first);
+              },
+            ),
+            const SizedBox(height: 20),
+            Text('Paper template', style: theme.textTheme.titleMedium),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final t in TemplateType.values)
+                  ChoiceChip(
+                    avatar: Icon(t.iconData, size: 18),
+                    label: Text(t.displayName),
+                    selected: _template == t,
+                    onSelected: (_) {
+                      setState(() => _template = t);
+                      widget.onTemplate(t);
+                    },
+                  ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Text('Paper color', style: theme.textTheme.titleMedium),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                for (final c in _papers)
+                  GestureDetector(
+                    onTap: () {
+                      setState(() => _color = c);
+                      widget.onColor(c);
+                    },
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      margin: const EdgeInsets.only(right: 16),
+                      decoration: BoxDecoration(
+                        color: c,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: _color.toARGB32() == c.toARGB32()
+                              ? theme.colorScheme.primary
+                              : theme.dividerColor,
+                          width: _color.toARGB32() == c.toARGB32() ? 3 : 1,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

@@ -66,9 +66,18 @@ List<SceneElement> editorSelection(WidgetRef ref, ScenePageKey key) {
 }
 
 /// Undo / redo + overflow menu (paste, library, export). Drop into AppBar.actions.
+///
+/// [onChangeBackground], when supplied, adds a "Background & paper…" entry to
+/// the overflow menu. It is optional because the dev playground has no notebook
+/// to restyle — only the real notebook editor wires it up.
 class EditorAppBarActions extends ConsumerWidget {
   final ScenePageKey pageKey;
-  const EditorAppBarActions({super.key, required this.pageKey});
+  final VoidCallback? onChangeBackground;
+  const EditorAppBarActions({
+    super.key,
+    required this.pageKey,
+    this.onChangeBackground,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -93,6 +102,8 @@ class EditorAppBarActions extends ConsumerWidget {
         icon: const Icon(Icons.more_vert),
         onSelected: (v) {
           switch (v) {
+            case 'background':
+              onChangeBackground?.call();
             case 'paste':
               _paste(ref);
             case 'library':
@@ -103,13 +114,25 @@ class EditorAppBarActions extends ConsumerWidget {
               _export(context, ref, v);
           }
         },
-        itemBuilder: (_) => const [
-          PopupMenuItem(value: 'paste', child: Text('Paste')),
-          PopupMenuItem(value: 'library', child: Text('Element library…')),
-          PopupMenuDivider(),
-          PopupMenuItem(value: 'png', child: Text('Export / share PNG')),
-          PopupMenuItem(value: 'svg', child: Text('Export / share SVG')),
-          PopupMenuItem(value: 'pdf', child: Text('Export / share PDF')),
+        itemBuilder: (_) => [
+          if (onChangeBackground != null) ...const [
+            PopupMenuItem(
+              value: 'background',
+              child: ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(Icons.wallpaper_outlined),
+                title: Text('Background & paper…'),
+              ),
+            ),
+            PopupMenuDivider(),
+          ],
+          const PopupMenuItem(value: 'paste', child: Text('Paste')),
+          const PopupMenuItem(
+              value: 'library', child: Text('Element library…')),
+          const PopupMenuDivider(),
+          const PopupMenuItem(value: 'png', child: Text('Export / share PNG')),
+          const PopupMenuItem(value: 'svg', child: Text('Export / share SVG')),
+          const PopupMenuItem(value: 'pdf', child: Text('Export / share PDF')),
         ],
       ),
     ]);
@@ -118,12 +141,15 @@ class EditorAppBarActions extends ConsumerWidget {
   Future<void> _paste(WidgetRef ref) async {
     final els = await ClipboardService.paste(nextId: editorNewId);
     if (els == null || els.isEmpty) return;
-    final base = ref.read(sceneControllerProvider(pageKey).notifier).nextZOrder();
+    final base =
+        ref.read(sceneControllerProvider(pageKey).notifier).nextZOrder();
     final placed = [
       for (int i = 0; i < els.length; i++)
         ZOrderService.withZOrder(els[i], base + i)
     ];
-    ref.read(historyProvider(pageKey).notifier).push(AddElementsCommand(placed));
+    ref
+        .read(historyProvider(pageKey).notifier)
+        .push(AddElementsCommand(placed));
     ref.read(selectionProvider.notifier).selectMany(placed.map((e) => e.id));
   }
 
@@ -138,7 +164,8 @@ class EditorAppBarActions extends ConsumerWidget {
     final at = ref
         .read(viewportProvider)
         .toScene(Offset(size.width / 2, size.height / 2));
-    final base = ref.read(sceneControllerProvider(pageKey).notifier).nextZOrder();
+    final base =
+        ref.read(sceneControllerProvider(pageKey).notifier).nextZOrder();
     final els = LibraryService.instantiate(item,
         at: at, nextId: editorNewId, baseZOrder: base);
     if (els.isEmpty) return;
@@ -148,7 +175,8 @@ class EditorAppBarActions extends ConsumerWidget {
 
   Future<void> _export(BuildContext context, WidgetRef ref, String fmt) async {
     final sel = editorSelection(ref, pageKey);
-    final els = sel.isNotEmpty ? sel : ref.read(sceneControllerProvider(pageKey));
+    final els =
+        sel.isNotEmpty ? sel : ref.read(sceneControllerProvider(pageKey));
     if (els.isEmpty) {
       _toast(context, 'Nothing to export');
       return;
@@ -163,14 +191,23 @@ class EditorAppBarActions extends ConsumerWidget {
     if (!ok && context.mounted) _toast(context, 'Nothing to export');
   }
 
-  void _toast(BuildContext context, String msg) => ScaffoldMessenger.of(context)
-      .showSnackBar(SnackBar(content: Text(msg)));
+  void _toast(BuildContext context, String msg) =>
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
 }
 
 /// The full bottom bar: selection actions + tools + style + palette + size.
+///
+/// When [floating] is true the bar paints its own translucent background and
+/// rounded bottom edge so it can be overlaid at the top of the canvas instead
+/// of sitting in the Scaffold's bottom slot.
 class EditorBottomBar extends ConsumerWidget {
   final ScenePageKey pageKey;
-  const EditorBottomBar({super.key, required this.pageKey});
+  final bool floating;
+  const EditorBottomBar({
+    super.key,
+    required this.pageKey,
+    this.floating = false,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -178,96 +215,163 @@ class EditorBottomBar extends ConsumerWidget {
     final selectedIds = ref.watch(selectionProvider);
     final toolCtl = ref.read(editorToolProvider.notifier);
 
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (selectedIds.isNotEmpty) _SelectionBar(pageKey: pageKey),
-            Row(
-              children: [
-                Expanded(
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        for (final (t, icon) in kEditorTools)
-                          IconButton(
-                            isSelected: tool.tool == t,
-                            onPressed: () => toolCtl.setTool(t),
-                            icon: Icon(icon),
-                            style: IconButton.styleFrom(
-                              backgroundColor: tool.tool == t
-                                  ? Theme.of(context)
-                                      .colorScheme
-                                      .primaryContainer
-                                  : null,
-                            ),
-                          ),
-                      ],
-                    ),
+    final content = Padding(
+      padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (selectedIds.isNotEmpty) _SelectionBar(pageKey: pageKey),
+          Row(
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      for (final (t, icon) in kEditorTools)
+                        _ToolIconButton(
+                          tool: t,
+                          icon: icon,
+                          state: tool,
+                          onTap: () {
+                            // Re-tapping the active eraser flips its mode
+                            // (stroke/element ↔ pixel) without opening a menu.
+                            if (t == EditorTool.eraser &&
+                                tool.tool == EditorTool.eraser) {
+                              toolCtl.setEraserPixel(!tool.eraserPixel);
+                            } else {
+                              toolCtl.setTool(t);
+                            }
+                          },
+                        ),
+                    ],
                   ),
                 ),
-                IconButton.filledTonal(
-                  tooltip: 'Style',
-                  icon: const Icon(Icons.tune),
-                  onPressed: () => showModalBottomSheet<void>(
-                    context: context,
-                    showDragHandle: true,
-                    builder: (_) => const EditorStyleSheet(),
-                  ),
+              ),
+              IconButton.filledTonal(
+                tooltip: 'Style',
+                icon: const Icon(Icons.tune),
+                onPressed: () => showModalBottomSheet<void>(
+                  context: context,
+                  showDragHandle: true,
+                  builder: (_) => const EditorStyleSheet(),
                 ),
-              ],
-            ),
-            if (tool.tool == EditorTool.shape) ...[
-              const SizedBox(height: 6),
-              Wrap(
-                spacing: 4,
-                children: [
-                  for (final (type, icon) in kEditorShapes)
-                    ChoiceChip(
-                      showCheckmark: false,
-                      label: Icon(icon, size: 18),
-                      selected: tool.shapeType == type,
-                      onSelected: (_) => toolCtl.setShapeType(type),
-                    ),
-                ],
               ),
             ],
+          ),
+          if (tool.tool == EditorTool.shape) ...[
             const SizedBox(height: 6),
-            Row(
+            Wrap(
+              spacing: 4,
               children: [
-                for (final c in kEditorPalette)
-                  GestureDetector(
-                    onTap: () => toolCtl.setColor(c),
-                    child: Container(
-                      width: 24,
-                      height: 24,
-                      margin: const EdgeInsets.symmetric(horizontal: 3),
-                      decoration: BoxDecoration(
-                        color: Color(c),
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: tool.color == c ? Colors.black : Colors.black26,
-                          width: tool.color == c ? 3 : 1,
-                        ),
-                      ),
-                    ),
+                for (final (type, icon) in kEditorShapes)
+                  ChoiceChip(
+                    showCheckmark: false,
+                    label: Icon(icon, size: 18),
+                    selected: tool.shapeType == type,
+                    onSelected: (_) => toolCtl.setShapeType(type),
                   ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Slider(
-                    min: 1,
-                    max: 24,
-                    value: tool.size.clamp(1, 24),
-                    onChanged: toolCtl.setSize,
-                  ),
-                ),
               ],
             ),
           ],
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              for (final c in kEditorPalette)
+                GestureDetector(
+                  onTap: () => toolCtl.setColor(c),
+                  child: Container(
+                    width: 24,
+                    height: 24,
+                    margin: const EdgeInsets.symmetric(horizontal: 3),
+                    decoration: BoxDecoration(
+                      color: Color(c),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: tool.color == c ? Colors.black : Colors.black26,
+                        width: tool.color == c ? 3 : 1,
+                      ),
+                    ),
+                  ),
+                ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Slider(
+                  min: 1,
+                  max: 24,
+                  value: tool.size.clamp(1, 24),
+                  onChanged: toolCtl.setSize,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+
+    if (!floating) return SafeArea(child: content);
+
+    // Top overlay: translucent background, rounded bottom edge, soft shadow.
+    final scheme = Theme.of(context).colorScheme;
+    return SafeArea(
+      bottom: false,
+      child: Container(
+        decoration: BoxDecoration(
+          color: scheme.surface.withValues(alpha: 0.82),
+          borderRadius:
+              const BorderRadius.vertical(bottom: Radius.circular(16)),
+          boxShadow: const [
+            BoxShadow(
+              color: Colors.black12,
+              blurRadius: 10,
+              offset: Offset(0, 2),
+            ),
+          ],
         ),
+        child: content,
+      ),
+    );
+  }
+}
+
+/// A single tool button in the bottom bar. For the eraser it shows a distinct
+/// icon per mode (stroke/element vs pixel) so the current mode is visible, and
+/// its tap behaviour (select vs toggle mode) is decided by the parent.
+class _ToolIconButton extends StatelessWidget {
+  final EditorTool tool;
+  final IconData icon;
+  final EditorToolState state;
+  final VoidCallback onTap;
+
+  const _ToolIconButton({
+    required this.tool,
+    required this.icon,
+    required this.state,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isActive = state.tool == tool;
+    final isEraser = tool == EditorTool.eraser;
+
+    final displayIcon = isEraser
+        ? (state.eraserPixel ? Icons.auto_fix_high : Icons.layers_clear)
+        : icon;
+    final tooltip = isEraser
+        ? (state.eraserPixel
+            ? 'Pixel eraser — tap to switch to stroke'
+            : 'Stroke eraser — tap to switch to pixel')
+        : null;
+
+    return IconButton(
+      tooltip: tooltip,
+      isSelected: isActive,
+      onPressed: onTap,
+      icon: Icon(displayIcon),
+      style: IconButton.styleFrom(
+        backgroundColor:
+            isActive ? Theme.of(context).colorScheme.primaryContainer : null,
       ),
     );
   }
@@ -445,7 +549,8 @@ class _SelectionBar extends ConsumerWidget {
               onPressed: () => Navigator.of(context).pop(),
               child: const Text('Cancel')),
           TextButton(
-              onPressed: () => Navigator.of(context).pop(clean(controller.text)),
+              onPressed: () =>
+                  Navigator.of(context).pop(clean(controller.text)),
               child: const Text('Save')),
         ],
       ),
@@ -524,8 +629,10 @@ class EditorStyleSheet extends ConsumerWidget {
               SegmentedButton<FillStyle>(
                 showSelectedIcon: false,
                 segments: const [
-                  ButtonSegment(value: FillStyle.hachure, label: Text('Hachure')),
-                  ButtonSegment(value: FillStyle.crossHatch, label: Text('Cross')),
+                  ButtonSegment(
+                      value: FillStyle.hachure, label: Text('Hachure')),
+                  ButtonSegment(
+                      value: FillStyle.crossHatch, label: Text('Cross')),
                   ButtonSegment(value: FillStyle.solid, label: Text('Solid')),
                 ],
                 selected: {tool.fillStyle},
@@ -537,8 +644,10 @@ class EditorStyleSheet extends ConsumerWidget {
                 showSelectedIcon: false,
                 segments: const [
                   ButtonSegment(value: StrokeStyle.solid, label: Text('Solid')),
-                  ButtonSegment(value: StrokeStyle.dashed, label: Text('Dashed')),
-                  ButtonSegment(value: StrokeStyle.dotted, label: Text('Dotted')),
+                  ButtonSegment(
+                      value: StrokeStyle.dashed, label: Text('Dashed')),
+                  ButtonSegment(
+                      value: StrokeStyle.dotted, label: Text('Dotted')),
                 ],
                 selected: {tool.strokeStyle},
                 onSelectionChanged: (s) => c.setStrokeStyle(s.first),

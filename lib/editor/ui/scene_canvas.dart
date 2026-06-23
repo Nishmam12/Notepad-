@@ -47,12 +47,17 @@ class SceneCanvas extends ConsumerStatefulWidget {
   final Color backgroundColor;
   final TemplateType templateType;
 
+  /// When true the canvas is a single bounded page (matching the canvas aspect)
+  /// with zoom limited to 50–300%; otherwise it is an infinite whiteboard.
+  final bool pageMode;
+
   const SceneCanvas({
     super.key,
     required this.notebookId,
     required this.pageId,
     this.backgroundColor = const Color(0xFFFFFDF7),
     this.templateType = TemplateType.blank,
+    this.pageMode = false,
   });
 
   @override
@@ -84,11 +89,17 @@ class _SceneCanvasState extends ConsumerState<SceneCanvas>
   List<SceneElement> _selOriginals = const [];
   bool _didTransform = false;
 
+  // Last viewport configuration pushed to the controller, to avoid redundant
+  // post-frame updates.
+  Size? _configuredSize;
+  bool? _configuredPageMode;
+
   ScenePageKey get _key =>
       (notebookId: widget.notebookId, pageId: widget.pageId);
 
   HistoryController get _history => ref.read(historyProvider(_key).notifier);
-  SceneController get _scene => ref.read(sceneControllerProvider(_key).notifier);
+  SceneController get _scene =>
+      ref.read(sceneControllerProvider(_key).notifier);
 
   @override
   void initState() {
@@ -231,6 +242,26 @@ class _SceneCanvasState extends ConsumerState<SceneCanvas>
     if (scaleDelta != 1.0) {
       vp.zoomAtPoint(ref.read(viewportProvider).zoom * scaleDelta, focal);
     }
+  }
+
+  /// Pushes the current page geometry / mode to the viewport controller once
+  /// per change (after layout, so the canvas size is known). In page mode the
+  /// page matches the canvas size so it fills the view at 100%.
+  void _syncViewportConfig(Size size) {
+    if (size.isEmpty) return;
+    if (_configuredSize == size && _configuredPageMode == widget.pageMode) {
+      return;
+    }
+    _configuredSize = size;
+    _configuredPageMode = widget.pageMode;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(viewportProvider.notifier).configure(
+            pageMode: widget.pageMode,
+            pageSize: size,
+            viewportSize: size,
+          );
+    });
   }
 
   // ---- eraser ---------------------------------------------------------------
@@ -426,8 +457,9 @@ class _SceneCanvasState extends ConsumerState<SceneCanvas>
     final finalDelta = delta + snap.adjust;
     _guides.value = [for (final g in snap.guides) (g.a, g.b)];
     _didTransform = true;
-    _scene.updateMany(
-        [for (final e in _selOriginals) SceneTransformer.translate(e, finalDelta)]);
+    _scene.updateMany([
+      for (final e in _selOriginals) SceneTransformer.translate(e, finalDelta)
+    ]);
   }
 
   void _applyResize(Offset scene) {
@@ -650,115 +682,151 @@ class _SceneCanvasState extends ConsumerState<SceneCanvas>
     final activeColor = eraserPixelActive ? 0xFF9AA0A6 : tool.color;
     final activeOpacity = eraserPixelActive ? 0.4 : tool.opacity;
 
-    return ScenePointerListener(
-      isHandTool: tool.isHand,
-      onPointerDown: _onDown,
-      onPointerMove: _onMove,
-      onPointerUp: _onUp,
-      onStrokeCancel: _cancel,
-      onViewportUpdate: _onViewportUpdate,
-      child: ClipRect(
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            RepaintBoundary(
-              child: CustomPaint(
-                painter: BackgroundLayer(
-                  backgroundColor: widget.backgroundColor,
-                  templateType: widget.templateType,
+    return LayoutBuilder(builder: (context, constraints) {
+      final canvasSize = constraints.biggest;
+      _syncViewportConfig(canvasSize);
+      // In page mode the page matches the canvas size (so it fills the view at
+      // 100%); null means the infinite whiteboard.
+      final Rect? pageRect =
+          widget.pageMode ? (Offset.zero & canvasSize) : null;
+
+      return ScenePointerListener(
+        isHandTool: tool.isHand,
+        onPointerDown: _onDown,
+        onPointerMove: _onMove,
+        onPointerUp: _onUp,
+        onStrokeCancel: _cancel,
+        onViewportUpdate: _onViewportUpdate,
+        child: ClipRect(
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              RepaintBoundary(
+                child: CustomPaint(
+                  painter: BackgroundLayer(
+                    backgroundColor: widget.backgroundColor,
+                    templateType: widget.templateType,
+                    scrollX: viewport.scrollX,
+                    scrollY: viewport.scrollY,
+                    zoom: viewport.zoom,
+                    pageRect: pageRect,
+                  ),
+                  size: Size.infinite,
                 ),
-                size: Size.infinite,
               ),
-            ),
-            Transform(
-              transform: viewport.toMatrix4(),
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  RepaintBoundary(
-                    child: AnimatedBuilder(
-                      animation: _imageCache,
-                      builder: (_, __) => ValueListenableBuilder<Set<String>>(
-                        valueListenable: _eraserPending,
-                        builder: (_, hidden, ___) => CustomPaint(
-                          painter: SceneStaticLayer(
-                            elements: elements,
-                            hiddenIds: hidden,
-                            imageResolver: _imageCache.get,
-                            imageEpoch: _imageCache.version,
+              _clipToPageScreen(
+                  pageRect == null ? null : viewport.toViewportRect(pageRect),
+                  Transform(
+                    transform: viewport.toMatrix4(),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        RepaintBoundary(
+                          child: AnimatedBuilder(
+                            animation: _imageCache,
+                            builder: (_, __) =>
+                                ValueListenableBuilder<Set<String>>(
+                              valueListenable: _eraserPending,
+                              builder: (_, hidden, ___) => CustomPaint(
+                                painter: SceneStaticLayer(
+                                  elements: elements,
+                                  hiddenIds: hidden,
+                                  imageResolver: _imageCache.get,
+                                  imageEpoch: _imageCache.version,
+                                ),
+                                size: Size.infinite,
+                              ),
+                            ),
                           ),
-                          size: Size.infinite,
                         ),
-                      ),
+                        RepaintBoundary(
+                          child: ValueListenableBuilder<List<StrokePoint>>(
+                            valueListenable: _active,
+                            builder: (_, points, __) => CustomPaint(
+                              painter: SceneActiveStrokeLayer(
+                                points: points,
+                                color: activeColor,
+                                size: tool.size,
+                                opacity: activeOpacity,
+                              ),
+                              size: Size.infinite,
+                            ),
+                          ),
+                        ),
+                        RepaintBoundary(
+                          child: ValueListenableBuilder<SceneShapeElement?>(
+                            valueListenable: _preview,
+                            builder: (_, preview, __) => CustomPaint(
+                              painter: ScenePreviewLayer(preview),
+                              size: Size.infinite,
+                            ),
+                          ),
+                        ),
+                        RepaintBoundary(
+                          child: ValueListenableBuilder<List<LaserPoint>>(
+                            valueListenable: _laser,
+                            builder: (_, pts, __) => CustomPaint(
+                              painter: SceneLaserLayer(
+                                points: pts,
+                                nowMs: DateTime.now().millisecondsSinceEpoch,
+                              ),
+                              size: Size.infinite,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  RepaintBoundary(
-                    child: ValueListenableBuilder<List<StrokePoint>>(
-                      valueListenable: _active,
-                      builder: (_, points, __) => CustomPaint(
-                        painter: SceneActiveStrokeLayer(
-                          points: points,
-                          color: activeColor,
-                          size: tool.size,
-                          opacity: activeOpacity,
+                  )),
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: ValueListenableBuilder<Rect?>(
+                    valueListenable: _marquee,
+                    builder: (_, marqueeScene, __) =>
+                        ValueListenableBuilder<List<(Offset, Offset)>>(
+                      valueListenable: _guides,
+                      builder: (_, guidesScene, __) => CustomPaint(
+                        painter: SelectionOverlayLayer(
+                          boxScreen: boxScreen,
+                          handleScreen: handleScreen,
+                          rotateScreen: rotateScreen,
+                          marqueeScreen: marqueeScene == null
+                              ? null
+                              : viewport.toViewportRect(marqueeScene),
+                          guides: [
+                            for (final (a, b) in guidesScene)
+                              (viewport.toViewport(a), viewport.toViewport(b))
+                          ],
                         ),
                         size: Size.infinite,
                       ),
-                    ),
-                  ),
-                  RepaintBoundary(
-                    child: ValueListenableBuilder<SceneShapeElement?>(
-                      valueListenable: _preview,
-                      builder: (_, preview, __) => CustomPaint(
-                        painter: ScenePreviewLayer(preview),
-                        size: Size.infinite,
-                      ),
-                    ),
-                  ),
-                  RepaintBoundary(
-                    child: ValueListenableBuilder<List<LaserPoint>>(
-                      valueListenable: _laser,
-                      builder: (_, pts, __) => CustomPaint(
-                        painter: SceneLaserLayer(
-                          points: pts,
-                          nowMs: DateTime.now().millisecondsSinceEpoch,
-                        ),
-                        size: Size.infinite,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Positioned.fill(
-              child: IgnorePointer(
-                child: ValueListenableBuilder<Rect?>(
-                  valueListenable: _marquee,
-                  builder: (_, marqueeScene, __) =>
-                      ValueListenableBuilder<List<(Offset, Offset)>>(
-                    valueListenable: _guides,
-                    builder: (_, guidesScene, __) => CustomPaint(
-                      painter: SelectionOverlayLayer(
-                        boxScreen: boxScreen,
-                        handleScreen: handleScreen,
-                        rotateScreen: rotateScreen,
-                        marqueeScreen: marqueeScene == null
-                            ? null
-                            : viewport.toViewportRect(marqueeScene),
-                        guides: [
-                          for (final (a, b) in guidesScene)
-                            (viewport.toViewport(a), viewport.toViewport(b))
-                        ],
-                      ),
-                      size: Size.infinite,
                     ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
-      ),
-    );
+      );
+    });
   }
+
+  /// Clips [child] to the page's on-screen rect when in page mode; returns it
+  /// unchanged on the infinite canvas.
+  Widget _clipToPageScreen(Rect? pageScreen, Widget child) {
+    if (pageScreen == null) return child;
+    return ClipRect(clipper: _RectClipper(pageScreen), child: child);
+  }
+}
+
+/// Clips to a fixed screen-space rectangle (used to keep drawn content inside
+/// the page in single-page mode).
+class _RectClipper extends CustomClipper<Rect> {
+  final Rect rect;
+  const _RectClipper(this.rect);
+
+  @override
+  Rect getClip(Size size) => rect;
+
+  @override
+  bool shouldReclip(_RectClipper oldClipper) => rect != oldClipper.rect;
 }
